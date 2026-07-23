@@ -49,7 +49,9 @@ function isPublicMarketingPath(pathname: string) {
     pathname.startsWith("/pricing") ||
     pathname.startsWith("/resources") ||
     pathname.startsWith("/platforms") ||
-    pathname.startsWith("/contact")
+    pathname.startsWith("/contact") ||
+    pathname.startsWith("/privacy") ||
+    pathname.startsWith("/terms")
   );
 }
 
