@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const isImage = mimeType.startsWith("image/");
   const isVideo = mimeType.startsWith("video/");
 
-  let publicUrl: string;
+  let publicUrl: string | undefined;
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
@@ -83,6 +83,10 @@ export async function POST(req: Request) {
         );
       }
     }
+  }
+
+  if (!publicUrl) {
+    return NextResponse.json({ error: "Dosya kaydedilemedi" }, { status: 500 });
   }
 
   await prisma.mediaAsset.update({
