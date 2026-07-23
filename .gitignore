@@ -9,7 +9,9 @@ build
 .DS_Store
 coverage
 .turbo
-uploads
+# Uploaded media only — do NOT ignore apps/web/src/app/api/uploads
+apps/web/public/uploads/
+public/uploads/
 tmp
 data
 packages/db/prisma/*.db
@@ -17,3 +19,6 @@ packages/db/src/generated
 .vercel
 agent-tools
 *.tsbuildinfo
+
+.vercel
+.env*
