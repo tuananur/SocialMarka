@@ -8,11 +8,13 @@ import {
   createTikTokPkcePair,
   exchangeOAuthCode,
   getAppOrigin,
+  getOAuthRedirectOrigin,
   hasPlatformOAuthCredentials,
   signOAuthState,
   verifyOAuthState,
   type OAuthConnectType,
 } from "@/lib/social-oauth";
+import { getPlatformCreds } from "@/lib/platform-credentials";
 
 const VALID = new Set(Object.values(PlatformType));
 
@@ -73,6 +75,28 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
   }
 
   const platform = provider as PlatformType;
+  const redirectOrigin = getOAuthRedirectOrigin(req, platform);
+  if (platform === "TIKTOK" && !redirectOrigin) {
+    return NextResponse.redirect(
+      new URL("/accounts/create?error=tiktok_https", origin),
+    );
+  }
+  const oauthOrigin = redirectOrigin || origin;
+
+  // TikTok Login Kit debug: /api/accounts/oauth/tiktok?diag=1
+  if (platform === "TIKTOK" && url.searchParams.get("diag") === "1") {
+    const creds = getPlatformCreds("TIKTOK");
+    const callbackUri = `${oauthOrigin}${oauthCallbackPath(platform)}`;
+    return NextResponse.json({
+      clientKeyPrefix: creds?.clientId?.slice(0, 4) || null,
+      clientKeyLen: creds?.clientId?.length || 0,
+      isSandboxKey: Boolean(creds?.clientId?.startsWith("sbaw")),
+      redirectUri: callbackUri,
+      loginKitMustMatchExactly: callbackUri,
+      tip: "Paste redirectUri into TikTok Login Kit (Sandbox) Redirect URI, then Save. Add your TikTok account under Target Users.",
+    });
+  }
+
   const pkce =
     platform === "X"
       ? createPkcePair()
@@ -88,7 +112,7 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
   });
 
   // Konsolda kayıtlı URI — yeni /api/auth/*/callback ile uyum için aynı path
-  const callbackUri = `${origin}${oauthCallbackPath(platform)}`;
+  const callbackUri = `${oauthOrigin}${oauthCallbackPath(platform)}`;
   const hasCreds = hasPlatformOAuthCredentials(platform);
   const wantRealOAuth =
     !forceLocal && hasCreds && (forceReal || process.env.USE_REAL_OAUTH !== "false");
@@ -162,7 +186,8 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
   });
 
   const typeLabel = CONNECT_LABEL[parsed.connectType] || "Hesap";
-  const callbackUri = `${origin}${oauthCallbackPath(provider)}`;
+  const redirectOrigin = getOAuthRedirectOrigin(req, provider) || origin;
+  const callbackUri = `${redirectOrigin}${oauthCallbackPath(provider)}`;
   const isPlatformApp =
     hasPlatformOAuthCredentials(provider) &&
     !code.startsWith("auth_") &&

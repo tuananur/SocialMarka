@@ -91,10 +91,12 @@ const META: Record<
     consoleUrl: "https://developers.tiktok.com/",
     redirectHint: "/api/accounts/oauth/tiktok/callback",
     steps: [
-      "TikTok Developers’da uygulama oluştur",
-      "Login Kit + Content Posting API",
-      "Redirect URI ekle",
-      "Client Key / Secret kaydet",
+      "TikTok Developers → Sandbox mode (not Production)",
+      "Add product: Login Kit (Web)",
+      "Redirect URI (exact): https://social-marka-web-g2y9.vercel.app/api/accounts/oauth/tiktok/callback",
+      "Sandbox → Target Users: add your TikTok account",
+      "Use Sandbox Client Key (starts with sbaw) + Secret → Save",
+      "Connect only from the Vercel HTTPS URL (not localhost)",
     ],
   },
   pinterest: {

@@ -483,6 +483,29 @@ export function getAppOrigin(req: Request) {
   return `${url.protocol}//${url.host}`;
 }
 
+/**
+ * TikTok only accepts https redirect URIs. Prefer configured public HTTPS origin
+ * so localhost / mis-set env cannot send http://… and get mislabeled as client_key.
+ */
+export function getOAuthRedirectOrigin(req: Request, provider: PlatformType) {
+  if (provider === "TIKTOK") {
+    const candidates = [
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.NEXTAUTH_URL,
+      process.env.AUTH_URL,
+      getAppOrigin(req),
+    ];
+    for (const raw of candidates) {
+      const origin = String(raw || "")
+        .trim()
+        .replace(/\/$/, "");
+      if (origin.startsWith("https://")) return origin;
+    }
+    return null;
+  }
+  return getAppOrigin(req);
+}
+
 export function envKeysForProvider(provider: PlatformType): string[] {
   switch (provider) {
     case "FACEBOOK":

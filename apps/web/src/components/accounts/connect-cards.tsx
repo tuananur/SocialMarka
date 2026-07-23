@@ -127,6 +127,10 @@ const ERROR_MSG: Record<string, string> = {
   access_denied: "Permission denied.",
   platform: "Invalid platform.",
   limit: "Account limit reached. Buy additional accounts to connect more.",
+  tiktok_https:
+    "TikTok requires HTTPS. Open https://social-marka-web-g2y9.vercel.app and connect from there (not localhost).",
+  tiktok_client_key:
+    "TikTok Client Key missing on server. Check Vercel TIKTOK_CLIENT_KEY (Sandbox key starting with sbaw).",
 };
 
 export function ConnectPlatformCards({
