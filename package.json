@@ -1,0 +1,26 @@
+{
+  "name": "socialmarka",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @socialmarka/web",
+    "build": "npm run build -w @socialmarka/db && npm run build -w @socialmarka/shared && npm run build -w @socialmarka/queue && npm run build -w @socialmarka/web",
+    "db:generate": "npm run generate -w @socialmarka/db",
+    "db:migrate": "npm run migrate -w @socialmarka/db",
+    "db:seed": "dotenv -e .env -- npm run seed -w @socialmarka/db",
+    "db:clean-demo": "dotenv -e .env -- npm run clean-demo -w @socialmarka/db",
+    "db:push": "dotenv -e .env -- npm run push -w @socialmarka/db",
+    "worker:publish": "dotenv -e .env -- npm run start:publish -w @socialmarka/workers",
+    "worker:general": "dotenv -e .env -- npm run start:general -w @socialmarka/workers",
+    "worker:media": "dotenv -e .env -- npm run start:media -w @socialmarka/workers"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
+  }
+}

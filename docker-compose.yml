@@ -1,0 +1,138 @@
+# SocialMarka — 7 izole container + Traefik domain routing
+# Mimari: social.* (tanıtım) | app.social.* / app.* (panel) | api.* (API)
+# Internet → Traefik → Next.js App Router → (marketing) | (dashboard)
+
+services:
+  # 1. Reverse Proxy (SSL entrypoints + domain routing)
+  proxy:
+    image: traefik:v2.10
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socialmarka
+
+  # 2. Ana Web & Dashboard (Next.js — marketing + app aynı süreç)
+  app:
+    build:
+      context: .
+      target: runner
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://socialmarka:socialmarka@postgres:5432/socialmarka
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    labels:
+      - "traefik.enable=true"
+      # Tanıtım: social.domain.com / socialmarka.com (apex + www + local)
+      - "traefik.http.routers.marketing.rule=Host(`socialmarka.com`) || Host(`www.socialmarka.com`) || Host(`social.socialmarka.com`) || Host(`socialmarka.localhost`) || Host(`www.socialmarka.localhost`) || Host(`social.socialmarka.localhost`)"
+      - "traefik.http.routers.marketing.entrypoints=web"
+      - "traefik.http.routers.marketing.service=app"
+      # Panel: app.social.domain.com / app.socialmarka.com
+      - "traefik.http.routers.app.rule=Host(`app.socialmarka.com`) || Host(`app.social.socialmarka.com`) || Host(`app.socialmarka.localhost`) || Host(`app.social.socialmarka.localhost`)"
+      - "traefik.http.routers.app.entrypoints=web"
+      - "traefik.http.routers.app.service=app"
+      # API / webhook host
+      - "traefik.http.routers.api.rule=Host(`api.socialmarka.com`) || Host(`api.socialmarka.localhost`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api.service=app"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
+    networks:
+      - socialmarka
+
+  # 3. Paylaşım Worker (zamanlanmış post → publish)
+  worker-publish:
+    build:
+      context: .
+      target: worker
+    command: npm run worker:publish
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://socialmarka:socialmarka@postgres:5432/socialmarka
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - socialmarka
+
+  # 4. Genel Worker (analitik, webhook, token refresh, inbox reply)
+  worker-general:
+    build:
+      context: .
+      target: worker
+    command: npm run worker:general
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://socialmarka:socialmarka@postgres:5432/socialmarka
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - socialmarka
+
+  # 5. Medya Worker (FFmpeg transcode / görsel işleme)
+  worker-media:
+    build:
+      context: .
+      target: worker-media
+    command: npm run worker:media
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://socialmarka:socialmarka@postgres:5432/socialmarka
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - socialmarka
+
+  # 6. PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: socialmarka
+      POSTGRES_PASSWORD: socialmarka
+      POSTGRES_DB: socialmarka
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - socialmarka
+
+  # 7. Redis (AOF persistence)
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - socialmarka
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  socialmarka:
+    driver: bridge

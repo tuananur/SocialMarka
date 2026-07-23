@@ -1,0 +1,289 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Auth.js models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  workspaceMembers WorkspaceMember[]
+  auditLogs        AuditLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  members             WorkspaceMember[]
+  groups              AccountGroup[]
+  accounts            SocialAccount[]
+  posts               Post[]
+  inboxConversations  InboxConversation[]
+  auditLogs           AuditLog[]
+}
+
+model WorkspaceMember {
+  id          String @id @default(uuid())
+  role        Role   @default(MEMBER)
+  userId      String
+  workspaceId String
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+enum Role {
+  SYSTEM_ADMIN
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model AccountGroup {
+  id          String   @id @default(uuid())
+  name        String
+  workspaceId String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  accounts  SocialAccount[] @relation("GroupToAccount")
+}
+
+model SocialAccount {
+  id                    String        @id @default(uuid())
+  provider              PlatformType
+  providerAccountId     String
+  accountName           String
+  profilePicUrl         String?
+  encryptedAccessToken  String?       @db.Text
+  encryptedRefreshToken String?       @db.Text
+  tokenExpiresAt        DateTime?
+  status                AccountStatus @default(CONNECTED)
+  lastConnectedBy       String?
+  workspaceId           String
+  createdAt             DateTime      @default(now())
+
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  groups             AccountGroup[]       @relation("GroupToAccount")
+  postTargets        PostTarget[]
+  inboxConversations InboxConversation[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@unique([workspaceId, provider, providerAccountId])
+}
+
+enum PlatformType {
+  FACEBOOK
+  INSTAGRAM
+  LINKEDIN
+  YOUTUBE
+  X
+  TIKTOK
+  PINTEREST
+}
+
+enum AccountStatus {
+  CONNECTED
+  REQUIRES_REAUTH
+  DISCONNECTED
+}
+
+model Post {
+  id          String     @id @default(uuid())
+  content     String     @db.Text
+  status      PostStatus @default(DRAFT)
+  scheduledAt DateTime?
+  bullJobId   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspaceId String
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  targets   PostTarget[]
+  media     MediaAsset[]
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PENDING_REVIEW
+  PUBLISHED
+  PARTIAL_FAILED
+  FAILED
+}
+
+model PostTarget {
+  id              String       @id @default(uuid())
+  postId          String
+  socialAccountId String
+  platformContent String?      @db.Text
+  status          TargetStatus @default(PENDING)
+  publishedAt     DateTime?
+  errorMessage    String?      @db.Text
+  remotePostId    String?
+
+  post          Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+}
+
+enum TargetStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+model InboxConversation {
+  id              String    @id @default(uuid())
+  workspaceId     String
+  socialAccountId String
+  senderName      String
+  senderAvatar    String?
+  lastMessage     String?   @db.Text
+  lastMessageAt   DateTime  @default(now())
+  isRead          Boolean   @default(false)
+  type            InboxType @default(DIRECT_MESSAGE)
+  remoteId        String?
+  createdAt       DateTime  @default(now())
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  messages      InboxMessage[]
+}
+
+enum InboxType {
+  COMMENT
+  DIRECT_MESSAGE
+}
+
+model InboxMessage {
+  id             String     @id @default(uuid())
+  conversationId String
+  senderType     SenderType
+  messageText    String     @db.Text
+  createdAt      DateTime   @default(now())
+
+  conversation InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+enum SenderType {
+  USER
+  AGENT
+}
+
+model WebhookEvent {
+  id             String       @id @default(uuid())
+  provider       PlatformType
+  eventId        String?
+  payload        Json
+  signatureValid Boolean      @default(true)
+  status         String       @default("PENDING")
+  receivedAt     DateTime     @default(now())
+  processedAt    DateTime?
+
+  @@unique([provider, eventId])
+}
+
+model MediaAsset {
+  id           String   @id @default(uuid())
+  originalUrl  String
+  mimeType     String
+  postId       String?
+  variants     Json?
+  thumbnailUrl String?
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+}
+
+model AnalyticsSnapshot {
+  id              String   @id @default(uuid())
+  socialAccountId String
+  followers       Int      @default(0)
+  following       Int      @default(0)
+  impressions     Int      @default(0)
+  reach           Int      @default(0)
+  likes           Int      @default(0)
+  comments        Int      @default(0)
+  postsCount      Int      @default(0)
+  capturedAt      DateTime @default(now())
+
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+}
+
+model SystemMetricSnapshot {
+  id                   String   @id @default(uuid())
+  totalUsers           Int      @default(0)
+  totalWorkspaces      Int      @default(0)
+  totalSocialAccounts  Int      @default(0)
+  totalPublishedPosts  Int      @default(0)
+  totalQueuedPosts     Int      @default(0)
+  totalFailedPosts     Int      @default(0)
+  capturedAt           DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  details     Json?
+  userId      String
+  workspaceId String
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}

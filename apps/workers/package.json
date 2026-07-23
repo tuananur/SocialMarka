@@ -1,0 +1,20 @@
+{
+  "name": "@socialmarka/workers",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start:publish": "tsx src/publish.ts",
+    "start:general": "tsx src/general.ts",
+    "start:media": "tsx src/media.ts"
+  },
+  "dependencies": {
+    "@socialmarka/db": "*",
+    "@socialmarka/queue": "*",
+    "@socialmarka/shared": "*",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
