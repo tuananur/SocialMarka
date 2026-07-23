@@ -116,7 +116,9 @@ export function buildPlatformAuthorizeUrl(opts: {
     }
     case "TIKTOK": {
       if (!codeChallenge) return null;
-      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc("user.info.basic,video.upload")}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
+      // Sandbox Login Kit: start with basic scope; video.upload needs Content Posting product
+      const scope = "user.info.basic";
+      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc(scope)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "PINTEREST": {
       return `https://www.pinterest.com/oauth/?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("boards:read,pins:read,pins:write,user_accounts:read")}&state=${enc(state)}`;
@@ -462,6 +464,16 @@ async function exchangePinterest(code: string, redirectUri: string): Promise<Exc
 }
 
 export function getAppOrigin(req: Request) {
+  // Prefer the live request host on Vercel so localhost env cannot poison redirect_uri
+  const hostHeader =
+    req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+  const host = hostHeader.split(",")[0]?.trim();
+  const protoHeader = req.headers.get("x-forwarded-proto") || "";
+  const proto = (protoHeader.split(",")[0]?.trim() || "https").replace(/:$/, "");
+  if (host && !/^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host)) {
+    return `${proto}://${host}`.replace(/\/$/, "");
+  }
+
   const env =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.AUTH_URL ||

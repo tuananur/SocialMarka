@@ -9,6 +9,15 @@ export type PlatformCreds = {
 
 type Store = Partial<Record<PlatformType, PlatformCreds>>;
 
+/** Strip quotes/whitespace that break OAuth when pasted into Vercel/.env */
+export function normalizeCredValue(raw?: string | null): string {
+  return String(raw || "")
+    .trim()
+    .replace(/^["']+|["']+$/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
+
 function storePath() {
   const candidates = [
     path.join(process.cwd(), "data", "platform-oauth.json"),
@@ -43,77 +52,69 @@ function writeStore(data: Store) {
   writeFileSync(storePath(), JSON.stringify(data, null, 2), "utf8");
 }
 
-/** Panelden kaydedilen + .env birleşik kimlik bilgileri */
-export function getPlatformCreds(provider: PlatformType): PlatformCreds | null {
-  const stored = readStore()[provider];
-  if (isValidCreds(stored)) return stored!;
-
+function envCreds(provider: PlatformType): PlatformCreds | null {
   switch (provider) {
     case "FACEBOOK":
     case "INSTAGRAM":
-      if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
-        const creds = {
-          clientId: process.env.FACEBOOK_APP_ID,
-          clientSecret: process.env.FACEBOOK_APP_SECRET,
-        };
-        if (isValidCreds(creds)) return creds;
-      }
-      break;
+      return {
+        clientId: normalizeCredValue(process.env.FACEBOOK_APP_ID),
+        clientSecret: normalizeCredValue(process.env.FACEBOOK_APP_SECRET),
+      };
     case "LINKEDIN":
-      if (process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET) {
-        const creds = {
-          clientId: process.env.LINKEDIN_CLIENT_ID,
-          clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
-        };
-        if (isValidCreds(creds)) return creds;
-      }
-      break;
+      return {
+        clientId: normalizeCredValue(process.env.LINKEDIN_CLIENT_ID),
+        clientSecret: normalizeCredValue(process.env.LINKEDIN_CLIENT_SECRET),
+      };
     case "YOUTUBE":
-      if (process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET) {
-        const creds = {
-          clientId: process.env.YOUTUBE_CLIENT_ID,
-          clientSecret: process.env.YOUTUBE_CLIENT_SECRET,
-        };
-        if (isValidCreds(creds)) return creds;
-      }
-      break;
+      return {
+        clientId: normalizeCredValue(process.env.YOUTUBE_CLIENT_ID),
+        clientSecret: normalizeCredValue(process.env.YOUTUBE_CLIENT_SECRET),
+      };
     case "X":
-      if (process.env.X_CLIENT_ID && process.env.X_CLIENT_SECRET) {
-        const creds = {
-          clientId: process.env.X_CLIENT_ID,
-          clientSecret: process.env.X_CLIENT_SECRET,
-        };
-        if (isValidCreds(creds)) return creds;
-      }
-      break;
+      return {
+        clientId: normalizeCredValue(process.env.X_CLIENT_ID),
+        clientSecret: normalizeCredValue(process.env.X_CLIENT_SECRET),
+      };
     case "TIKTOK":
-      if (process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET) {
-        const creds = {
-          clientId: process.env.TIKTOK_CLIENT_KEY,
-          clientSecret: process.env.TIKTOK_CLIENT_SECRET,
-        };
-        if (isValidCreds(creds)) return creds;
-      }
-      break;
+      return {
+        clientId: normalizeCredValue(process.env.TIKTOK_CLIENT_KEY),
+        clientSecret: normalizeCredValue(process.env.TIKTOK_CLIENT_SECRET),
+      };
     case "PINTEREST":
-      if (process.env.PINTEREST_APP_ID && process.env.PINTEREST_APP_SECRET) {
-        const creds = {
-          clientId: process.env.PINTEREST_APP_ID,
-          clientSecret: process.env.PINTEREST_APP_SECRET,
-        };
-        if (isValidCreds(creds)) return creds;
-      }
-      break;
+      return {
+        clientId: normalizeCredValue(process.env.PINTEREST_APP_ID),
+        clientSecret: normalizeCredValue(process.env.PINTEREST_APP_SECRET),
+      };
+    default:
+      return null;
+  }
+}
+
+/** Env (Vercel) öncelikli; panel dosyası yalnızca env yoksa */
+export function getPlatformCreds(provider: PlatformType): PlatformCreds | null {
+  const fromEnv = envCreds(provider);
+  if (isValidCreds(fromEnv)) return fromEnv;
+
+  const stored = readStore()[provider];
+  if (stored) {
+    const normalized = {
+      clientId: normalizeCredValue(stored.clientId),
+      clientSecret: normalizeCredValue(stored.clientSecret),
+    };
+    if (isValidCreds(normalized)) return normalized;
   }
   return null;
 }
 
 function isValidCreds(creds?: PlatformCreds | null): boolean {
-  if (!creds?.clientId?.trim() || !creds?.clientSecret?.trim()) return false;
-  const id = creds.clientId.trim();
+  if (!creds) return false;
+  const id = normalizeCredValue(creds.clientId);
+  const secret = normalizeCredValue(creds.clientSecret);
+  if (!id || !secret) return false;
   // E-posta / telefon Client ID olamaz (sık karışıklık)
   if (id.includes("@") || id.includes(" ")) return false;
-  if (/^\d{4,8}$/.test(creds.clientSecret.trim())) return false; // tipik PIN/şifre
+  if (/^\d{4,8}$/.test(secret)) return false; // tipik PIN/şifre
+  if (id.length < 8 || id.length > 64) return false;
   return true;
 }
 
@@ -198,8 +199,8 @@ function applyCredsToEnv(provider: PlatformType, creds: PlatformCreds) {
 
 export function savePlatformCreds(provider: PlatformType, creds: PlatformCreds) {
   const next = {
-    clientId: creds.clientId.trim(),
-    clientSecret: creds.clientSecret.trim(),
+    clientId: normalizeCredValue(creds.clientId),
+    clientSecret: normalizeCredValue(creds.clientSecret),
   };
   if (!isValidCreds(next)) {
     throw new Error(

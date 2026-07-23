@@ -101,6 +101,22 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
       codeChallenge: pkce?.codeChallenge,
     });
     if (authUrl) {
+      // Guard: empty client_key produces TikTok "fix client_key" page
+      if (platform === "TIKTOK") {
+        try {
+          const u = new URL(authUrl);
+          const key = u.searchParams.get("client_key") || "";
+          if (!key || key.length < 8) {
+            return NextResponse.redirect(
+              new URL("/accounts/create?error=tiktok_client_key", origin),
+            );
+          }
+        } catch {
+          return NextResponse.redirect(
+            new URL("/accounts/create?error=tiktok_client_key", origin),
+          );
+        }
+      }
       return NextResponse.redirect(authUrl);
     }
   }
