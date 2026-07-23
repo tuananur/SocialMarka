@@ -114,7 +114,7 @@ function isValidCreds(creds?: PlatformCreds | null): boolean {
   // E-posta / telefon Client ID olamaz (sık karışıklık)
   if (id.includes("@") || id.includes(" ")) return false;
   if (/^\d{4,8}$/.test(secret)) return false; // tipik PIN/şifre
-  if (id.length < 8 || id.length > 64) return false;
+  if (id.length < 8 || id.length > 128) return false;
   return true;
 }
 
