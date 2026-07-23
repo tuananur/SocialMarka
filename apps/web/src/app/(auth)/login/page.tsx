@@ -24,7 +24,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(
     errorParam
       ? errorParam === "Configuration"
-        ? "Google OAuth yapılandırması eksik veya hatalı. E-posta ile giriş yapın."
+        ? "Sunucu giriş ayarı eksik (AUTH_SECRET). Yönetici Vercel Environment Variables’a AUTH_SECRET eklemeli."
         : errorParam === "workspace_inactive"
           ? "Çalışma alanınız pasif. Yönetici ile iletişime geçin."
           : "Giriş başarısız. Bilgilerinizi kontrol edin."

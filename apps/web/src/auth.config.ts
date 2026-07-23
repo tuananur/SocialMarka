@@ -8,6 +8,7 @@ export const isGoogleAuthConfigured = Boolean(googleId && googleSecret);
 
 /** Edge-safe config (middleware). Credentials live in auth.ts */
 export const authConfig: NextAuthConfig = {
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   providers: [
     ...(isGoogleAuthConfigured
       ? [
