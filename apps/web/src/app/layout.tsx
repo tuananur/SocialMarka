@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   title: "SocialMarka — Sosyal Medya Yönetim Platformu",
   description:
     "Tüm sosyal medya hesaplarınızı tek yerden yönetin. Planlayın, yayınlayın, etkileşime geçin.",
+  other: {
+    "tiktok-developers-site-verification": "vHdkJVCIpQ1o4YcttaDHkpAUMx6Hk0VL",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
