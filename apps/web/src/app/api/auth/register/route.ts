@@ -84,9 +84,8 @@ export async function POST(req: Request) {
             : noTables
               ? "Veritabanı tabloları yok. Neon’da prisma db push çalıştırın."
               : "Kayıt sırasında bir hata oluştu.",
-        ...(process.env.NODE_ENV !== "production"
-          ? { debug: message, code }
-          : { code: code || undefined }),
+        detail: message.slice(0, 300),
+        code: code || undefined,
       },
       { status: 500 }
     );
