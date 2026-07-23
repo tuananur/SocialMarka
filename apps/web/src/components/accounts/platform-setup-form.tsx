@@ -255,7 +255,7 @@ export function PlatformSetupForm({
             onChange={(e) => setClientId(e.target.value)}
             className="mt-1 w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-accent"
             placeholder={
-              provider === "linkedin"
+              providerKey === "linkedin"
                 ? "örn. 86abcdef… (e-posta değil)"
                 : "1234567890…"
             }

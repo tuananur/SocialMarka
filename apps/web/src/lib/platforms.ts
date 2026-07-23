@@ -16,7 +16,7 @@ export type PlatformPage = {
   longDescription: string;
   benefits: { title: string; desc: string }[];
   features: string[];
-  workflow: { step: string; title: string; desc: string }[];
+  workflow: { step: string; title: string; desc: string; details?: string[] }[];
   useCases: { title: string; desc: string }[];
   tips: string[];
 };

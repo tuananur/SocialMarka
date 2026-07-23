@@ -2,6 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "buildCommand": "npm run db:generate && npm run build -w @socialmarka/shared && npm run build -w @socialmarka/db && npm run build -w @socialmarka/queue && npm run build -w @socialmarka/web",
-  "outputDirectory": "apps/web/.next"
+  "buildCommand": "npm run db:generate && npm run build -w @socialmarka/shared && npm run build -w @socialmarka/db && npm run build -w @socialmarka/queue && npm run build -w @socialmarka/web"
 }

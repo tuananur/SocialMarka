@@ -1,13 +1,16 @@
 export type PostMedia = {
+  id?: string;
   thumbnailUrl: string | null;
   originalUrl: string;
+  mimeType?: string | null;
 };
 
 export type ManagePostTarget = {
   id: string;
   status: string;
   errorMessage: string | null;
-  socialAccount: { provider: string; accountName: string };
+  platformContent?: string | null;
+  socialAccount: { id?: string; provider: string; accountName: string };
 };
 
 export type ManagePost = {

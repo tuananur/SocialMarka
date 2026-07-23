@@ -124,12 +124,11 @@ function PinterestIcon({ size, className, ...rest }: IconProps) {
   );
 }
 
-function FallbackIcon({ size, className, label, ...rest }: IconProps & { label: string }) {
+function FallbackIcon({ size, className, label }: { size?: number; className?: string; label: string }) {
   return (
     <span
       className={`inline-flex items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-white ${className || ""}`}
       style={{ width: size, height: size }}
-      {...rest}
     >
       {label.slice(0, 2).toUpperCase()}
     </span>

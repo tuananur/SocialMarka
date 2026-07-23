@@ -303,7 +303,11 @@ export function PostsWorkspace({
       if (t.platformContent) pc[t.socialAccount.provider] = t.platformContent;
     }
     setPlatformContents(pc);
-    setSelectedAccountIds(post.targets.map((t) => t.socialAccount.id));
+    setSelectedAccountIds(
+      post.targets
+        .map((t) => t.socialAccount.id)
+        .filter((id): id is string => Boolean(id)),
+    );
     setScheduledAt(post.scheduledAt ? post.scheduledAt.slice(0, 16) : "");
     const m = post.media?.[0];
     if (m) {
@@ -377,6 +381,14 @@ export function PostsWorkspace({
       if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
       return null;
     });
+    setMediaMime(null);
+    setMediaFileName(null);
+    setMediaAssetId(null);
+  }
+
+  function setMediaFromUrl(url: string) {
+    clearMediaPreview();
+    setMediaPreview(url);
     setMediaMime(null);
     setMediaFileName(null);
     setMediaAssetId(null);

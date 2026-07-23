@@ -551,7 +551,6 @@ function actionLabel(action: string) {
     POST_CREATED: "Gönderi oluşturuldu",
     POST_UPDATED: "Gönderi güncellendi",
     POST_DELETED: "Gönderi silindi",
-    POST_DELETED: "Gönderi silindi",
     POST_SHARE_NOW: "Hemen paylaşım tetiklendi",
     ACCOUNT_CONNECTED: "Hesap bağlandı",
     ACCOUNT_DISCONNECTED: "Hesap bağlantısı kesildi",
