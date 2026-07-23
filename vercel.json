@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "npm install",
-  "buildCommand": "npm run db:generate && npm run build -w @socialmarka/shared && npm run build -w @socialmarka/db && npm run build -w @socialmarka/queue && npm run build -w @socialmarka/web"
+  "installCommand": "npm install && npm install @prisma/client@6.1.0 prisma@6.1.0 --no-save",
+  "buildCommand": "npx prisma generate --schema=packages/db/prisma/schema.prisma && npm run build -w @socialmarka/shared && npm run build -w @socialmarka/db && npm run build -w @socialmarka/queue && npm run build -w @socialmarka/web"
 }
