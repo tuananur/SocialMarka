@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "**" },
     ],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "64mb",
+    },
+  },
   serverExternalPackages: ["@prisma/client", "prisma", "bullmq", "ioredis"],
   outputFileTracingRoot: path.join(__dirname, "../.."),
   outputFileTracingIncludes: {

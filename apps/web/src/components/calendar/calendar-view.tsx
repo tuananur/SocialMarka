@@ -254,6 +254,10 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 function CalendarListRow({ post, onOpen }: { post: Post; onOpen: () => void }) {
   const thumb = postThumbnail(post);
+  const mime = post.media?.[0]?.mimeType || "";
+  const isVideo =
+    mime.startsWith("video/") ||
+    Boolean(thumb && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(thumb));
   const when = post.scheduledAt ? new Date(post.scheduledAt) : null;
   const account = post.targets[0]?.socialAccount;
 
@@ -264,8 +268,18 @@ function CalendarListRow({ post, onOpen }: { post: Post; onOpen: () => void }) {
       className="flex w-full items-center gap-3 rounded-xl border border-ink-200/80 bg-white p-3 text-left hover:border-brand-200"
     >
       {thumb ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumb} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+        isVideo ? (
+          <video
+            src={thumb}
+            muted
+            playsInline
+            preload="metadata"
+            className="h-12 w-12 shrink-0 rounded-lg object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumb} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+        )
       ) : (
         <div className="h-12 w-12 shrink-0 rounded-lg bg-ink-100" />
       )}
@@ -291,9 +305,14 @@ function CalendarCellPost({
   onOpen: () => void;
 }) {
   const thumb = postThumbnail(post);
+  const mime = post.media?.[0]?.mimeType || "";
+  const isVideo =
+    mime.startsWith("video/") ||
+    Boolean(thumb && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(thumb));
   const when = post.scheduledAt ? new Date(post.scheduledAt) : null;
   const account = post.targets[0]?.socialAccount;
   const title = post.content.trim().split("\n")[0] || "Gönderi";
+  const thumbClass = `shrink-0 rounded object-cover ${compact ? "h-7 w-7" : "h-9 w-9"}`;
 
   return (
     <button
@@ -315,12 +334,12 @@ function CalendarCellPost({
         </div>
         <div className="flex gap-1">
           {thumb ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumb}
-              alt=""
-              className={`shrink-0 rounded object-cover ${compact ? "h-7 w-7" : "h-9 w-9"}`}
-            />
+            isVideo ? (
+              <video src={thumb} muted playsInline preload="metadata" className={thumbClass} />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={thumb} alt="" className={thumbClass} />
+            )
           ) : (
             <div className={`shrink-0 rounded bg-ink-200 ${compact ? "h-7 w-7" : "h-9 w-9"}`} />
           )}
