@@ -5,6 +5,7 @@ import { getWorkspaceContext, canManageAccounts } from "@/lib/rbac";
 import {
   buildPlatformAuthorizeUrl,
   createPkcePair,
+  createTikTokPkcePair,
   exchangeOAuthCode,
   getAppOrigin,
   hasPlatformOAuthCredentials,
@@ -72,7 +73,12 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
   }
 
   const platform = provider as PlatformType;
-  const pkce = platform === "X" ? createPkcePair() : null;
+  const pkce =
+    platform === "X"
+      ? createPkcePair()
+      : platform === "TIKTOK"
+        ? createTikTokPkcePair()
+        : null;
   const state = signOAuthState({
     provider: platform,
     workspaceId: ctx.workspaceId,

@@ -60,6 +60,13 @@ export function createPkcePair() {
   return { codeVerifier, codeChallenge };
 }
 
+/** TikTok Login Kit: code_challenge = hex(SHA256(code_verifier)), not base64url */
+export function createTikTokPkcePair() {
+  const codeVerifier = randomBytes(32).toString("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier).digest("hex");
+  return { codeVerifier, codeChallenge };
+}
+
 export function hasPlatformOAuthCredentials(provider: PlatformType): boolean {
   return !!getPlatformCreds(provider);
 }
@@ -108,7 +115,8 @@ export function buildPlatformAuthorizeUrl(opts: {
       return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&scope=${enc("tweet.read tweet.write users.read offline.access")}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "TIKTOK": {
-      return `https://www.tiktok.com/v2/auth/authorize?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc("user.info.basic,video.upload")}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}`;
+      if (!codeChallenge) return null;
+      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc("user.info.basic,video.upload")}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "PINTEREST": {
       return `https://www.pinterest.com/oauth/?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("boards:read,pins:read,pins:write,user_accounts:read")}&state=${enc(state)}`;
@@ -148,7 +156,7 @@ export async function exchangeOAuthCode(opts: {
     case "X":
       return exchangeX(code, redirectUri, codeVerifier);
     case "TIKTOK":
-      return exchangeTikTok(code, redirectUri);
+      return exchangeTikTok(code, redirectUri, codeVerifier);
     case "PINTEREST":
       return exchangePinterest(code, redirectUri);
     default:
@@ -371,7 +379,11 @@ async function exchangeX(
   };
 }
 
-async function exchangeTikTok(code: string, redirectUri: string): Promise<ExchangedTokens> {
+async function exchangeTikTok(
+  code: string,
+  redirectUri: string,
+  codeVerifier?: string,
+): Promise<ExchangedTokens> {
   const creds = getPlatformCreds("TIKTOK");
   if (!creds) throw new Error("TikTok API anahtarları eksik");
   const body = new URLSearchParams({
@@ -381,6 +393,9 @@ async function exchangeTikTok(code: string, redirectUri: string): Promise<Exchan
     grant_type: "authorization_code",
     redirect_uri: redirectUri,
   });
+  if (codeVerifier) {
+    body.set("code_verifier", codeVerifier);
+  }
   const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
