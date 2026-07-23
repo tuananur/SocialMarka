@@ -198,12 +198,30 @@ function delayMs(date: Date) {
 
 async function scheduleTargets(postId: string, targetIds: string[], delay: number) {
   let firstJobId: string | undefined;
+  const preferInline =
+    delay === 0 &&
+    (process.env.INLINE_PUBLISH === "true" ||
+      process.env.VERCEL === "1" ||
+      !process.env.REDIS_URL?.trim());
+
   for (const targetId of targetIds) {
-    const job = await enqueuePublish(
-      { postId, postTargetId: targetId },
-      { delay, jobId: `publish-${targetId}-${Date.now()}` }
-    );
-    if (!firstJobId) firstJobId = job.id;
+    if (preferInline) {
+      const { publishPostTargetInline } = await import("@/lib/run-publish");
+      await publishPostTargetInline({ postId, postTargetId: targetId });
+      continue;
+    }
+    try {
+      const job = await enqueuePublish(
+        { postId, postTargetId: targetId },
+        { delay, jobId: `publish-${targetId}-${Date.now()}` },
+      );
+      if (!firstJobId) firstJobId = job.id;
+    } catch {
+      if (delay === 0) {
+        const { publishPostTargetInline } = await import("@/lib/run-publish");
+        await publishPostTargetInline({ postId, postTargetId: targetId });
+      }
+    }
   }
   if (firstJobId) {
     await prisma.post.update({

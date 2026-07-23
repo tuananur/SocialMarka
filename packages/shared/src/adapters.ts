@@ -4,6 +4,9 @@ import {
   refreshGoogleAccessToken,
 } from "./youtube-publish";
 import { publishXPost, refreshXAccessToken } from "./x-publish";
+import { publishTikTokVideo } from "./tiktok-publish";
+import { publishInstagram } from "./instagram-publish";
+import { publishPinterestPin } from "./pinterest-publish";
 
 function isLocalToken(token: string) {
   return (
@@ -32,9 +35,10 @@ async function publishLinkedIn(params: {
     ? params.providerAccountId
     : `urn:li:person:${params.providerAccountId}`;
 
+  const imageUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
   let text = params.content;
-  if (params.mediaUrls?.length) {
-    text = `${params.content}\n\n${params.mediaUrls[0]}`;
+  if (imageUrl && !params.content.includes(imageUrl)) {
+    text = `${params.content}\n\n${imageUrl}`.trim();
   }
 
   const body = {
@@ -93,18 +97,72 @@ async function publishFacebook(params: {
     };
   }
 
+  const pageId = params.providerAccountId;
+  const mediaUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
+  const isVideo =
+    Boolean(mediaUrl) &&
+    (/\.(mp4|mov|webm)(\?|$)/i.test(mediaUrl!) || mediaUrl!.includes("video"));
+
+  if (mediaUrl && isVideo) {
+    const form = new URLSearchParams();
+    form.set("file_url", mediaUrl);
+    form.set("description", params.content);
+    form.set("access_token", params.accessToken);
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${encodeURIComponent(pageId)}/videos`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form,
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        errorMessage: data.error?.message || "Facebook video yayınlama başarısız",
+      };
+    }
+    return { success: true, remotePostId: String(data.id || `fb_vid_${Date.now()}`) };
+  }
+
+  if (mediaUrl) {
+    const form = new URLSearchParams();
+    form.set("url", mediaUrl);
+    form.set("caption", params.content);
+    form.set("access_token", params.accessToken);
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${encodeURIComponent(pageId)}/photos`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form,
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        errorMessage: data.error?.message || "Facebook fotoğraf yayınlama başarısız",
+      };
+    }
+    return {
+      success: true,
+      remotePostId: String(data.post_id || data.id || `fb_photo_${Date.now()}`),
+    };
+  }
+
   const form = new URLSearchParams();
   form.set("message", params.content);
   form.set("access_token", params.accessToken);
-  if (params.mediaUrls?.[0]) form.set("link", params.mediaUrls[0]);
 
   const res = await fetch(
-    `https://graph.facebook.com/v19.0/${encodeURIComponent(params.providerAccountId)}/feed`,
+    `https://graph.facebook.com/v19.0/${encodeURIComponent(pageId)}/feed`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form,
-    }
+    },
   );
   const data = await res.json();
   if (!res.ok) {
@@ -114,19 +172,6 @@ async function publishFacebook(params: {
     };
   }
   return { success: true, remotePostId: String(data.id || `fb_${Date.now()}`) };
-}
-
-function notLiveYet(platform: string, token: string): PublishResult {
-  if (isLocalToken(token)) {
-    return {
-      success: false,
-      errorMessage: `${platform} canlı bağlı değil. Sistem uygulaması tanımlayıp hesabı yeniden bağlayın.`,
-    };
-  }
-  return {
-    success: false,
-    errorMessage: `${platform} canlı yayınlama yakında. Şu an LinkedIn ve Facebook destekleniyor.`,
-  };
 }
 
 export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
@@ -139,13 +184,12 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
         case "FACEBOOK":
           return publishFacebook(params);
         case "INSTAGRAM":
-          return notLiveYet("Instagram", params.accessToken);
+          return publishInstagram(params);
         case "YOUTUBE":
           if (isLocalToken(params.accessToken)) {
             return {
               success: false,
-              errorMessage:
-                "YouTube canlı bağlı değil. Hesabı yeniden yetkilendirin.",
+              errorMessage: "YouTube canlı bağlı değil. Hesabı yeniden yetkilendirin.",
             };
           }
           return publishYouTubeVideo({
@@ -158,8 +202,7 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
           if (isLocalToken(params.accessToken)) {
             return {
               success: false,
-              errorMessage:
-                "X canlı bağlı değil. Hesabı yeniden yetkilendirin.",
+              errorMessage: "X canlı bağlı değil. Hesabı yeniden yetkilendirin.",
             };
           }
           return publishXPost({
@@ -169,9 +212,9 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
             mediaUrls: params.mediaUrls,
           });
         case "TIKTOK":
-          return notLiveYet("TikTok", params.accessToken);
+          return publishTikTokVideo(params);
         case "PINTEREST":
-          return notLiveYet("Pinterest", params.accessToken);
+          return publishPinterestPin(params);
         default:
           return { success: false, errorMessage: "Bilinmeyen platform" };
       }

@@ -3,6 +3,9 @@ export * from "./platforms";
 export * from "./adapters";
 export * from "./youtube-publish";
 export * from "./x-publish";
+export * from "./tiktok-publish";
+export * from "./instagram-publish";
+export * from "./pinterest-publish";
 
 export const QUEUE_NAMES = {
   PUBLISH: "publish",

@@ -116,8 +116,8 @@ export function buildPlatformAuthorizeUrl(opts: {
     }
     case "TIKTOK": {
       if (!codeChallenge) return null;
-      // Sandbox Login Kit: start with basic scope; video.upload needs Content Posting product
-      const scope = "user.info.basic";
+      // Login + Content Posting (direct post / inbox upload)
+      const scope = "user.info.basic,video.upload,video.publish";
       return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc(scope)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "PINTEREST": {

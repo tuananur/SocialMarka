@@ -127,13 +127,16 @@ const worker = new Worker<PublishJobData>(
       }
     }
 
-    if (account.provider === "YOUTUBE" && mediaFiles.length === 0) {
+    if (
+      (account.provider === "YOUTUBE" || account.provider === "TIKTOK") &&
+      mediaFiles.length === 0
+    ) {
       await prisma.postTarget.update({
         where: { id: postTargetId },
         data: {
           status: TargetStatus.FAILED,
           errorMessage:
-            "YouTube için video dosyası bulunamadı. Medyayı yeniden yükleyip paylaşın.",
+            `${account.provider} için video dosyası bulunamadı. Medyayı yeniden yükleyip paylaşın.`,
         },
       });
       await refreshPostStatus(postId);
@@ -194,6 +197,16 @@ async function loadMediaFile(
   mimeType: string
 ): Promise<PublishMediaFile | null> {
   if (!originalUrl) return null;
+
+  if (originalUrl.startsWith("data:")) {
+    const m = originalUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) return null;
+    return {
+      buffer: Buffer.from(m[2], "base64"),
+      mimeType: m[1] || mimeType,
+      fileName: "media",
+    };
+  }
 
   if (/^https?:\/\//i.test(originalUrl)) {
     try {

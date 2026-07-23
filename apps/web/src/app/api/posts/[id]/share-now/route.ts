@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma, PostStatus, TargetStatus } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { enqueuePublish } from "@socialmarka/queue";
+import { publishPostTargetInline } from "@/lib/run-publish";
+
+export const maxDuration = 60;
 
 export async function POST(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const ctx = await getWorkspaceContext();
@@ -32,8 +35,9 @@ export async function POST(
     where: { postId: post.id, status: TargetStatus.PENDING },
   });
 
+  const results = [];
   for (const t of targets) {
-    await enqueuePublish({ postId: post.id, postTargetId: t.id }, { delay: 0 });
+    results.push(await publishNow(post.id, t.id));
   }
 
   await prisma.post.update({
@@ -44,11 +48,29 @@ export async function POST(
   await prisma.auditLog.create({
     data: {
       action: "POST_SHARE_NOW",
-      details: { postId: post.id },
+      details: { postId: post.id, results },
       userId: ctx.userId,
       workspaceId: ctx.workspaceId,
     },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, results });
+}
+
+async function publishNow(postId: string, postTargetId: string) {
+  const preferInline =
+    process.env.INLINE_PUBLISH === "true" ||
+    process.env.VERCEL === "1" ||
+    !process.env.REDIS_URL?.trim();
+
+  if (preferInline) {
+    return publishPostTargetInline({ postId, postTargetId });
+  }
+
+  try {
+    await enqueuePublish({ postId, postTargetId }, { delay: 0 });
+    return { success: true, queued: true };
+  } catch {
+    return publishPostTargetInline({ postId, postTargetId });
+  }
 }
