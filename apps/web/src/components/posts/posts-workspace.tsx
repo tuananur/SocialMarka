@@ -221,7 +221,7 @@ export function PostsWorkspace({
     setFirstComments({});
     setSelectedAccountIds([]);
     setScheduledAt("");
-    setMediaPreview(null);
+    clearMediaPreview();
     setShowEmojis(false);
     setShowMediaMenu(false);
     setPinTitle("");
@@ -417,6 +417,11 @@ export function PostsWorkspace({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Yükleme başarısız");
+
+      let publicUrl = String(data.publicUrl || "");
+      const assetId = String(data.assetId || "");
+      if (!assetId) throw new Error("Medya kaydı oluşmadı");
+
       if (data.uploadUrl) {
         const put = await fetch(data.uploadUrl, {
           method: "PUT",
@@ -424,9 +429,25 @@ export function PostsWorkspace({
           headers: { "Content-Type": file.type || "application/octet-stream" },
         });
         if (!put.ok) throw new Error("Dosya yüklemesi başarısız");
+      } else {
+        // No R2/Blob presign — upload bytes via server (local disk or Vercel Blob)
+        const form = new FormData();
+        form.set("file", file);
+        form.set("assetId", assetId);
+        const local = await fetch("/api/uploads/local", {
+          method: "POST",
+          body: form,
+        });
+        const localData = await local.json();
+        if (!local.ok) throw new Error(localData.error || "Dosya kaydedilemedi");
+        publicUrl = String(localData.publicUrl || publicUrl);
       }
-      setMediaPreview(data.publicUrl);
-      setMessage(data.stub ? "Medya eklendi (demo)." : "Medya yüklendi.");
+
+      setMediaAssetId(assetId);
+      setMediaPreview(publicUrl);
+      setMediaMime(file.type || null);
+      setMediaFileName(file.name);
+      setMessage("Medya yüklendi.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Medya yüklenemedi");
     } finally {
