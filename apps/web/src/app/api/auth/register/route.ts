@@ -60,15 +60,33 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error(e);
     const message = e instanceof Error ? e.message : "";
+    const code =
+      e && typeof e === "object" && "code" in e
+        ? String((e as { code?: string }).code || "")
+        : "";
     const dbDown =
       message.includes("Can't reach database") ||
       message.includes("ECONNREFUSED") ||
-      message.includes("P1001");
+      message.includes("P1001") ||
+      code === "P1001" ||
+      code === "P1017";
+    const noTables =
+      code === "P2021" ||
+      message.includes("does not exist") ||
+      message.includes("Unique constraint");
+    const missingEnv = !process.env.DATABASE_URL?.trim();
     return NextResponse.json(
       {
-        error: dbDown
-          ? "Veritabanına bağlanılamıyor. Postgres’in çalıştığından emin olun (docker compose up -d postgres)."
-          : "Kayıt sırasında bir hata oluştu.",
+        error: missingEnv
+          ? "DATABASE_URL eksik. Vercel Environment Variables’a Neon Postgres URL ekleyin."
+          : dbDown
+            ? "Veritabanına bağlanılamıyor. Vercel’deki DATABASE_URL’i kontrol edin (localhost olamaz)."
+            : noTables
+              ? "Veritabanı tabloları yok. Neon’da prisma db push çalıştırın."
+              : "Kayıt sırasında bir hata oluştu.",
+        ...(process.env.NODE_ENV !== "production"
+          ? { debug: message, code }
+          : { code: code || undefined }),
       },
       { status: 500 }
     );
