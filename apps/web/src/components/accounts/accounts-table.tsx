@@ -69,8 +69,8 @@ export function AccountsTable({
     const name = search.get("name") || PLATFORM_LABEL[provider] || provider;
     const label = PLATFORM_LABEL[provider] || provider;
     setBanner({
-      title: `${label} connected`,
-      description: `“${name}” was added to your workspace.`,
+      title: `${label} bağlandı`,
+      description: `“${name}” çalışma alanına eklendi.`,
     });
     router.replace("/accounts", { scroll: false });
   }, [search, router]);
@@ -150,12 +150,12 @@ export function AccountsTable({
             <span className="absolute inset-x-0 -bottom-3 h-[3px] rounded-full bg-amber-400" />
           </h1>
           <p className="mt-4 text-sm text-ink-500">
-            API’siz bağla, marka grubuna ekle, Gönderiler’de kullan.
+            Platform hesaplarını bağla, gruplara ayır ve gönderilerde kullan.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700">
-            {connectedCount}/{accountLimit} Accounts Connected
+            {connectedCount}/{accountLimit} hesap bağlı
           </span>
           {canManage ? (
             <Link

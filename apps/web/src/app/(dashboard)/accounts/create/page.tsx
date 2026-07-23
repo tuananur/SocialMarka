@@ -7,6 +7,7 @@ import {
   CreateAccountHeader,
 } from "@/components/accounts/connect-cards";
 import { getAccountLimit } from "@/lib/oauth-connect";
+import { getConfiguredProviders } from "@/lib/social-oauth";
 
 export default async function CreateAccountPage() {
   const { role, workspaceId } = await requireWorkspace();
@@ -27,15 +28,18 @@ export default async function CreateAccountPage() {
     }),
   ]);
 
+  const readyProviders = getConfiguredProviders();
+
   return (
     <div className="space-y-6">
       <CreateAccountHeader
         accountCount={accountCount}
         accountLimit={accountLimit}
       />
-      <Suspense fallback={<div className="text-sm text-ink-400">Loading…</div>}>
+      <Suspense fallback={<div className="text-sm text-ink-400">Yükleniyor…</div>}>
         <ConnectPlatformCards
           connectedProviders={connected.map((c) => c.provider)}
+          readyProviders={readyProviders}
           atLimit={accountCount >= accountLimit}
         />
       </Suspense>

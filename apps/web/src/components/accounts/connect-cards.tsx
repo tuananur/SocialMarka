@@ -27,19 +27,19 @@ const CARDS: PlatformCard[] = [
   {
     id: "FACEBOOK",
     name: "Facebook",
-    actions: [{ label: "Connect Page", type: "page", href: connectHref("facebook", "page") }],
+    actions: [{ label: "Sayfa bağla", type: "page", href: connectHref("facebook", "page") }],
   },
   {
     id: "INSTAGRAM",
     name: "Instagram",
     actions: [
       {
-        label: "Connect Personal",
+        label: "Kişisel hesap bağla",
         type: "personal",
         href: connectHref("instagram", "personal"),
       },
       {
-        label: "Connect Business or Creator",
+        label: "İşletme / Creator bağla",
         type: "business",
         href: connectHref("instagram", "business"),
       },
@@ -51,7 +51,7 @@ const CARDS: PlatformCard[] = [
     soon: true,
     actions: [
       {
-        label: "Connect Profile",
+        label: "Profil bağla",
         type: "profile",
         href: "/api/auth/google/connect?type=profile",
       },
@@ -62,12 +62,12 @@ const CARDS: PlatformCard[] = [
     name: "LinkedIn",
     actions: [
       {
-        label: "Connect Profile",
+        label: "Profil bağla",
         type: "profile",
         href: connectHref("linkedin", "profile"),
       },
       {
-        label: "Connect Page",
+        label: "Sayfa bağla",
         type: "page",
         href: connectHref("linkedin", "page"),
       },
@@ -78,7 +78,7 @@ const CARDS: PlatformCard[] = [
     name: "YouTube",
     actions: [
       {
-        label: "Connect Channel",
+        label: "Kanal bağla",
         type: "channel",
         href: connectHref("youtube", "channel"),
       },
@@ -89,7 +89,7 @@ const CARDS: PlatformCard[] = [
     name: "TikTok",
     actions: [
       {
-        label: "Connect Business",
+        label: "İşletme hesabı bağla",
         type: "business",
         href: connectHref("tiktok", "business"),
       },
@@ -101,7 +101,7 @@ const CARDS: PlatformCard[] = [
     followUs: true,
     actions: [
       {
-        label: "Connect Profile",
+        label: "Profil bağla",
         type: "profile",
         href: connectHref("x", "profile"),
       },
@@ -112,7 +112,7 @@ const CARDS: PlatformCard[] = [
     name: "Pinterest",
     actions: [
       {
-        label: "Connect Board",
+        label: "Pano bağla",
         type: "board",
         href: connectHref("pinterest", "board"),
       },
@@ -121,20 +121,24 @@ const CARDS: PlatformCard[] = [
 ];
 
 const ERROR_MSG: Record<string, string> = {
-  missing_code: "Connection could not be completed. Please try again.",
-  state: "Session expired. Please connect again.",
-  exchange: "Platform connection failed. Try again.",
-  access_denied: "Permission denied.",
-  platform: "Invalid platform.",
-  limit: "Account limit reached. Buy additional accounts to connect more.",
+  missing_code: "Bağlantı tamamlanamadı. Lütfen tekrar deneyin.",
+  state: "Oturum süresi doldu. Tekrar bağlayın.",
+  exchange: "Platform bağlantısı başarısız. Tekrar deneyin.",
+  access_denied: "İzin reddedildi.",
+  platform: "Geçersiz platform.",
+  limit: "Hesap limitine ulaşıldı. Daha fazla bağlamak için kota artırın.",
+  oauth_config:
+    "Bu platform için gerçek OAuth ayarı eksik veya hatalı. API anahtarlarını kontrol edin.",
+  missing_creds: "Platform API anahtarları tanımlı değil.",
   tiktok_https:
-    "TikTok requires HTTPS. Open https://social-marka-web-g2y9.vercel.app and connect from there (not localhost).",
+    "TikTok için HTTPS gerekli. https://social-marka-web-g2y9.vercel.app üzerinden bağlanın.",
   tiktok_client_key:
-    "TikTok Client Key missing on server. Check Vercel TIKTOK_CLIENT_KEY (Sandbox key starting with sbaw).",
+    "TikTok Client Key sunucuda eksik. Vercel TIKTOK_CLIENT_KEY değerini kontrol edin.",
 };
 
 export function ConnectPlatformCards({
   connectedProviders = [],
+  readyProviders = [],
   atLimit = false,
 }: {
   connectedProviders?: string[];
@@ -147,46 +151,59 @@ export function ConnectPlatformCards({
   const [followUs, setFollowUs] = useState(true);
   const connected = useMemo(
     () => new Set(connectedProviders.map((p) => p.toUpperCase())),
-    [connectedProviders]
+    [connectedProviders],
+  );
+  const ready = useMemo(
+    () => new Set(readyProviders.map((p) => p.toUpperCase())),
+    [readyProviders],
   );
 
   return (
     <div className="space-y-4">
       {error && ERROR_MSG[error] ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {ERROR_MSG[error]}
+          {ERROR_MSG[error]}{" "}
+          {(error === "oauth_config" || error === "missing_creds") && (
+            <Link href="/accounts/setup" className="font-semibold underline">
+              Kurulum
+            </Link>
+          )}
         </p>
       ) : null}
       {soon ? (
         <p className="rounded-xl border border-ink-100 bg-ink-50 px-4 py-3 text-sm text-ink-600">
-          Google Business Profile is coming soon.
+          Google Business Profile yakında eklenecek.
         </p>
       ) : null}
       {atLimit ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          You’ve reached your account limit.{" "}
+          Hesap limitine ulaştınız.{" "}
           <Link href="/pricing" className="font-semibold text-accent underline">
-            Buy Additional
-          </Link>{" "}
-          to connect more profiles.
+            Kota artır
+          </Link>
         </p>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {CARDS.map((p) => {
           const isLinked = connected.has(p.id);
+          const canConnect = (() => {
+            if (p.soon || atLimit) return false;
+            if (ready.size === 0) return true; // unknown → allow (server decides)
+            if (p.id === "INSTAGRAM") return ready.has("FACEBOOK") || ready.has("INSTAGRAM");
+            return ready.has(p.id);
+          })();
+
           return (
             <div
               key={p.id}
               className={`relative flex flex-col items-center rounded-2xl border bg-white px-5 py-7 text-center shadow-[var(--shadow-soft)] ${
-                isLinked
-                  ? "border-emerald-300 ring-1 ring-emerald-100"
-                  : "border-ink-200/80"
+                isLinked ? "border-emerald-300 ring-1 ring-emerald-100" : "border-ink-200/80"
               }`}
             >
               {isLinked ? (
                 <span className="absolute right-3 top-3 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                  Connected
+                  Bağlı
                 </span>
               ) : null}
 
@@ -197,31 +214,35 @@ export function ConnectPlatformCards({
               )}
               <h3 className="mt-3 text-[15px] font-semibold text-ink-900">{p.name}</h3>
 
-              <div className="mt-3 flex w-full flex-col gap-1.5">
+              <div className="mt-4 flex w-full flex-col gap-2">
                 {p.soon || atLimit ? (
                   <span className="text-sm font-medium text-ink-300">
-                    {p.soon ? "Coming soon" : "Limit reached"}
+                    {p.soon ? "Yakında" : "Limit dolu"}
                   </span>
+                ) : !canConnect ? (
+                  <Link
+                    href={`/accounts/setup?provider=${p.id.toLowerCase()}`}
+                    className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-100"
+                  >
+                    API kur
+                  </Link>
                 ) : (
                   p.actions.map((a) => {
-                    const href =
-                      p.followUs && !followUs
-                        ? `${a.href}&follow=0`
-                        : a.href;
+                    const href = p.followUs && !followUs ? `${a.href}&follow=0` : a.href;
                     return (
                       <a
                         key={a.label}
                         href={href}
-                        className="text-sm font-semibold text-accent hover:underline"
+                        className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
                       >
-                        [ {a.label} ]
+                        {a.label}
                       </a>
                     );
                   })
                 )}
               </div>
 
-              {p.followUs ? (
+              {p.followUs && canConnect ? (
                 <label className="mt-3 flex items-center gap-2 text-xs text-ink-500">
                   <input
                     type="checkbox"
@@ -229,7 +250,7 @@ export function ConnectPlatformCards({
                     checked={followUs}
                     onChange={(e) => setFollowUs(e.target.checked)}
                   />
-                  Follow Us
+                  Bizi takip et
                 </label>
               ) : null}
             </div>
@@ -252,18 +273,14 @@ export function CreateAccountHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <Link
-          href="/accounts"
-          className="text-sm font-semibold text-accent hover:underline"
-        >
-          &lt; Accounts
+        <Link href="/accounts" className="text-sm font-semibold text-accent hover:underline">
+          ← Hesaplar
         </Link>
         <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink-900">
-          Connect Account
+          Hesap bağla
         </h1>
         <p className="mt-1 max-w-xl text-sm text-ink-500">
-          Click a platform to open the official login and permission screen. Tokens
-          are encrypted and stored for your workspace only.
+          Platforma tıklayınca resmi giriş ve izin ekranı açılır. Jetonlar şifreli saklanır.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -274,20 +291,19 @@ export function CreateAccountHeader({
               : "border-ink-200 bg-white text-ink-700"
           }`}
         >
-          <span aria-hidden>⚠️</span>
           <span>
-            {accountCount}/{accountLimit} Accounts Connected
+            {accountCount}/{accountLimit} hesap bağlı
           </span>
           <span className="text-ink-300">|</span>
           <Link href="/pricing" className="text-accent hover:underline">
-            Buy Additional
+            Kota artır
           </Link>
         </div>
         <Link
           href="/accounts"
           className="rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
         >
-          Cancel
+          İptal
         </Link>
       </div>
     </div>

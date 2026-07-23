@@ -114,6 +114,10 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
   // Konsolda kayıtlı URI — yeni /api/auth/*/callback ile uyum için aynı path
   const callbackUri = `${oauthOrigin}${oauthCallbackPath(platform)}`;
   const hasCreds = hasPlatformOAuthCredentials(platform);
+  const allowSim =
+    forceLocal ||
+    process.env.ALLOW_LOCAL_OAUTH_SIM === "true" ||
+    process.env.NODE_ENV !== "production";
   const wantRealOAuth =
     !forceLocal && hasCreds && (forceReal || process.env.USE_REAL_OAUTH !== "false");
 
@@ -145,10 +149,24 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
     }
   }
 
-  const login = new URL(`/accounts/oauth/${platform.toLowerCase()}`, origin);
-  login.searchParams.set("state", state);
-  login.searchParams.set("type", connectType);
-  return NextResponse.redirect(login);
+  // Local/dev may use sim UI; production always requires real OAuth credentials
+  if (allowSim) {
+    const login = new URL(`/accounts/oauth/${platform.toLowerCase()}`, origin);
+    login.searchParams.set("state", state);
+    login.searchParams.set("type", connectType);
+    return NextResponse.redirect(login);
+  }
+
+  if (!hasCreds) {
+    return NextResponse.redirect(
+      new URL(
+        `/accounts/setup?provider=${encodeURIComponent(platform.toLowerCase())}&error=missing_creds`,
+        origin,
+      ),
+    );
+  }
+
+  return NextResponse.redirect(new URL("/accounts/create?error=oauth_config", origin));
 }
 
 /**
