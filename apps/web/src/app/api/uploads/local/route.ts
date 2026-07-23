@@ -49,7 +49,6 @@ export async function POST(req: Request) {
   } else {
     const relDir = path.posix.join("uploads", ctx.workspaceId);
     const relPath = path.posix.join(relDir, fileName);
-    // Prefer apps/web/public when cwd is monorepo root or apps/web
     const publicRoots = [
       path.join(process.cwd(), "public"),
       path.join(process.cwd(), "apps", "web", "public"),
@@ -63,21 +62,27 @@ export async function POST(req: Request) {
         await mkdir(absDir, { recursive: true });
         await writeFile(absFile, buffer);
         written = true;
+        publicUrl = `/${relPath.replace(/\\/g, "/")}`;
         break;
       } catch (err) {
         lastErr = err;
       }
     }
+    // Vercel has no durable disk — keep small images/videos as data URLs so calendar still works
     if (!written) {
-      const msg = lastErr instanceof Error ? lastErr.message : "disk yazma hatası";
-      return NextResponse.json(
-        {
-          error: `Dosya kaydedilemedi (${msg}). Vercel'de Blob store ekleyin.`,
-        },
-        { status: 500 },
-      );
+      const maxInline = 3.5 * 1024 * 1024;
+      if (buffer.length <= maxInline && (isImage || isVideo)) {
+        publicUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+      } else {
+        const msg = lastErr instanceof Error ? lastErr.message : "disk yazma hatası";
+        return NextResponse.json(
+          {
+            error: `Dosya kaydedilemedi (${msg}). Vercel Blob store ekleyin veya 3.5MB altı dosya kullanın.`,
+          },
+          { status: 500 },
+        );
+      }
     }
-    publicUrl = `/${relPath.replace(/\\/g, "/")}`;
   }
 
   await prisma.mediaAsset.update({

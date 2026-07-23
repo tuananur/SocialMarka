@@ -405,6 +405,10 @@ export function PostsWorkspace({
     setBusy(true);
     setMessage(null);
     setShowMediaMenu(false);
+    const localPreview = URL.createObjectURL(file);
+    setMediaPreview(localPreview);
+    setMediaMime(file.type || null);
+    setMediaFileName(file.name);
     try {
       const res = await fetch("/api/uploads/presign", {
         method: "POST",
@@ -430,7 +434,6 @@ export function PostsWorkspace({
         });
         if (!put.ok) throw new Error("Dosya yüklemesi başarısız");
       } else {
-        // No R2/Blob presign — upload bytes via server (local disk or Vercel Blob)
         const form = new FormData();
         form.set("file", file);
         form.set("assetId", assetId);
@@ -438,17 +441,25 @@ export function PostsWorkspace({
           method: "POST",
           body: form,
         });
-        const localData = await local.json();
-        if (!local.ok) throw new Error(localData.error || "Dosya kaydedilemedi");
-        publicUrl = String(localData.publicUrl || publicUrl);
+        const localData = await local.json().catch(() => ({}));
+        if (!local.ok) {
+          throw new Error(
+            (localData as { error?: string }).error ||
+              "Dosya kaydedilemedi. Sunucu depolama ayarını kontrol edin.",
+          );
+        }
+        publicUrl = String((localData as { publicUrl?: string }).publicUrl || publicUrl);
       }
 
       setMediaAssetId(assetId);
-      setMediaPreview(publicUrl);
-      setMediaMime(file.type || null);
-      setMediaFileName(file.name);
+      if (publicUrl && !publicUrl.includes("/uploads/pending/")) {
+        URL.revokeObjectURL(localPreview);
+        setMediaPreview(publicUrl);
+      }
       setMessage("Medya yüklendi.");
     } catch (e) {
+      URL.revokeObjectURL(localPreview);
+      clearMediaPreview();
       setMessage(e instanceof Error ? e.message : "Medya yüklenemedi");
     } finally {
       setBusy(false);
@@ -516,11 +527,17 @@ export function PostsWorkspace({
                     title={p.label}
                     disabled={!canEdit}
                     onClick={() => setActivePlatform(p.id)}
-                    className={`relative flex h-11 w-11 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm transition ${p.color} ${
-                      active ? "ring-2 ring-amber-400 ring-offset-2" : "opacity-80 hover:opacity-100"
+                    className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm transition ${
+                      active ? "ring-2 ring-amber-400 ring-offset-2" : "opacity-85 hover:opacity-100"
                     }`}
                   >
-                    {p.id === "ORIGINAL" ? "OR" : p.id.slice(0, 2)}
+                    {p.id === "ORIGINAL" ? (
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-700 text-[11px] font-bold text-white">
+                        OR
+                      </span>
+                    ) : (
+                      <ProviderIcon provider={p.id} size={44} className="rounded-full" />
+                    )}
                   </button>
                 );
               })}
@@ -562,8 +579,10 @@ export function PostsWorkspace({
                   className="mb-2"
                 />
               ) : null}
-              <div
-                className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink-200 bg-[#fafbfc] px-4 transition hover:border-accent/50 hover:bg-brand-50/30 ${
+              <button
+                type="button"
+                disabled={!canEdit || busy}
+                className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink-200 bg-[#fafbfc] px-4 text-center transition hover:border-accent/50 hover:bg-brand-50/30 disabled:cursor-not-allowed disabled:opacity-60 ${
                   mediaPreview ? "py-4" : "py-8"
                 }`}
                 onDragOver={(e) => {
@@ -576,65 +595,25 @@ export function PostsWorkspace({
                   const f = e.dataTransfer.files?.[0];
                   if (f) void uploadMedia(f);
                 }}
+                onClick={() => {
+                  if (!canEdit || busy) return;
+                  fileInputRef.current?.click();
+                }}
               >
                 {!mediaPreview ? (
                   <>
                     <span className="text-3xl text-ink-300">⬆</span>
                     <span className="text-sm font-semibold text-ink-700">
-                      Dosyaları sürükleyin veya yükleyin
+                      {busy ? "Yükleniyor…" : "Dosyaları sürükleyin veya tıklayın"}
                     </span>
                     <span className="text-xs text-ink-400">PNG, JPG, GIF, WEBP, MP4, MOV, WEBM</span>
                   </>
                 ) : (
-                  <span className="text-xs font-medium text-ink-500">Başka dosya eklemek için sürükleyin</span>
+                  <span className="text-xs font-medium text-ink-500">
+                    {busy ? "Yükleniyor…" : "Başka dosya için tıklayın veya sürükleyin"}
+                  </span>
                 )}
-                <button
-                  type="button"
-                  disabled={!canEdit || busy}
-                  onClick={() => setShowMediaMenu((v) => !v)}
-                  className="mt-1 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-600 transition hover:border-accent/40"
-                >
-                  Medya ekle
-                </button>
-              </div>
-
-              {showMediaMenu ? (
-                <div className="absolute left-0 right-0 z-20 mt-2 rounded-xl border border-brand-200 bg-white p-3 shadow-xl">
-                  <p className="mb-2 text-sm font-semibold text-ink-800">Medya Ekle</p>
-                  <div className="mb-3 flex gap-2">
-                    <input
-                      className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-accent"
-                      placeholder="Görsel URL girin"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const v = (e.target as HTMLInputElement).value.trim();
-                          if (v) {
-                            setMediaFromUrl(v);
-                            setShowMediaMenu(false);
-                          }
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-accent"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Yükle
-                    </button>
-                  </div>
-                  <p className="mb-1 text-xs font-semibold text-ink-500">Görsel veya video yükle</p>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-ink-50"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <span className="text-lg">☁</span> Cihazımdan
-                  </button>
-                  <div className="px-3 py-2 text-sm text-ink-400">Dropbox — yakında</div>
-                  <div className="px-3 py-2 text-sm text-ink-400">Google Drive — yakında</div>
-                </div>
-              ) : null}
+              </button>
             </div>
 
             <input
@@ -648,7 +627,6 @@ export function PostsWorkspace({
                 e.target.value = "";
               }}
             />
-
             {/* Pinterest fields */}
             {activePlatform === "PINTEREST" ? (
               <div className="mb-3 space-y-3">
