@@ -36,7 +36,6 @@ export async function POST(req: Request) {
     },
     include: { socialAccount: { select: { provider: true, accountName: true } } },
     take: 50,
-    orderBy: { updatedAt: "desc" },
   });
 
   const results = [];
