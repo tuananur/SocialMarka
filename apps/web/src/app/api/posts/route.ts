@@ -81,17 +81,26 @@ export async function POST(req: Request) {
     },
   });
 
+  // Media must be linked BEFORE publish (TikTok/YouTube/X need files)
+  await linkMediaAssets(post.id, mediaAssetIds);
+
   if (shareNow || scheduledAt) {
     await scheduleTargets(
       post.id,
       post.targets.map((t) => t.id),
-      shareNow ? 0 : delayMs(scheduledAt!)
+      shareNow ? 0 : delayMs(scheduledAt!),
     );
   }
 
-  await linkMediaAssets(post.id, mediaAssetIds);
+  const fresh = await prisma.post.findUnique({
+    where: { id: post.id },
+    include: {
+      targets: { include: { socialAccount: true } },
+      media: true,
+    },
+  });
 
-  return NextResponse.json({ post });
+  return NextResponse.json({ post: fresh || post });
 }
 
 export async function PATCH(req: Request) {
@@ -177,19 +186,25 @@ export async function PATCH(req: Request) {
     },
   });
 
+  await linkMediaAssets(post.id, mediaAssetIds);
+
   if (shareNow || scheduledAt) {
     await scheduleTargets(
       post.id,
       post.targets.map((t) => t.id),
-      shareNow ? 0 : delayMs(scheduledAt!)
+      shareNow ? 0 : delayMs(scheduledAt!),
     );
   }
 
-  if (mediaAssetIds.length) {
-    await linkMediaAssets(post.id, mediaAssetIds);
-  }
+  const fresh = await prisma.post.findUnique({
+    where: { id: post.id },
+    include: {
+      targets: { include: { socialAccount: true } },
+      media: true,
+    },
+  });
 
-  return NextResponse.json({ post });
+  return NextResponse.json({ post: fresh || post });
 }
 
 function delayMs(date: Date) {
@@ -198,14 +213,16 @@ function delayMs(date: Date) {
 
 async function scheduleTargets(postId: string, targetIds: string[], delay: number) {
   let firstJobId: string | undefined;
-  const preferInline =
-    delay === 0 &&
+  // Vercel has no publish worker — always run live publish inline for testing/production web
+  const forceInline =
+    process.env.INLINE_PUBLISH !== "false" &&
     (process.env.INLINE_PUBLISH === "true" ||
       process.env.VERCEL === "1" ||
-      !process.env.REDIS_URL?.trim());
+      !process.env.REDIS_URL?.trim() ||
+      delay === 0);
 
   for (const targetId of targetIds) {
-    if (preferInline) {
+    if (forceInline) {
       const { publishPostTargetInline } = await import("@/lib/run-publish");
       await publishPostTargetInline({ postId, postTargetId: targetId });
       continue;
@@ -217,10 +234,8 @@ async function scheduleTargets(postId: string, targetIds: string[], delay: numbe
       );
       if (!firstJobId) firstJobId = job.id;
     } catch {
-      if (delay === 0) {
-        const { publishPostTargetInline } = await import("@/lib/run-publish");
-        await publishPostTargetInline({ postId, postTargetId: targetId });
-      }
+      const { publishPostTargetInline } = await import("@/lib/run-publish");
+      await publishPostTargetInline({ postId, postTargetId: targetId });
     }
   }
   if (firstJobId) {

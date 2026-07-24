@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma, PostStatus, TargetStatus } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
-import { enqueuePublish } from "@socialmarka/queue";
 import { publishPostTargetInline } from "@/lib/run-publish";
 
 export const maxDuration = 60;
@@ -19,7 +18,7 @@ export async function POST(
 
   const post = await prisma.post.findFirst({
     where: { id, workspaceId: ctx.workspaceId },
-    include: { targets: true },
+    include: { targets: true, media: true },
   });
   if (!post) return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
 
@@ -33,16 +32,32 @@ export async function POST(
 
   const targets = await prisma.postTarget.findMany({
     where: { postId: post.id, status: TargetStatus.PENDING },
+    include: { socialAccount: { select: { provider: true } } },
   });
 
-  const results = [];
+  const results: { provider: string; success: boolean; error?: string; remotePostId?: string }[] =
+    [];
+
   for (const t of targets) {
-    results.push(await publishNow(post.id, t.id));
+    const r = await publishPostTargetInline({
+      postId: post.id,
+      postTargetId: t.id,
+    });
+    results.push({
+      provider: t.socialAccount.provider,
+      success: !!r.success,
+      error: "error" in r ? r.error : r.errorMessage,
+      remotePostId: "remotePostId" in r ? r.remotePostId : undefined,
+    });
   }
 
-  await prisma.post.update({
+  // Recompute status from targets (do not force SCHEDULED)
+  const updated = await prisma.post.findUnique({
     where: { id: post.id },
-    data: { status: PostStatus.SCHEDULED, scheduledAt: new Date() },
+    include: {
+      targets: { include: { socialAccount: true } },
+      media: true,
+    },
   });
 
   await prisma.auditLog.create({
@@ -54,23 +69,10 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ ok: true, results });
-}
-
-async function publishNow(postId: string, postTargetId: string) {
-  const preferInline =
-    process.env.INLINE_PUBLISH === "true" ||
-    process.env.VERCEL === "1" ||
-    !process.env.REDIS_URL?.trim();
-
-  if (preferInline) {
-    return publishPostTargetInline({ postId, postTargetId });
-  }
-
-  try {
-    await enqueuePublish({ postId, postTargetId }, { delay: 0 });
-    return { success: true, queued: true };
-  } catch {
-    return publishPostTargetInline({ postId, postTargetId });
-  }
+  return NextResponse.json({
+    ok: true,
+    results,
+    post: updated,
+    status: updated?.status || PostStatus.SCHEDULED,
+  });
 }
