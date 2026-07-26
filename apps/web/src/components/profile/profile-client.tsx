@@ -73,15 +73,11 @@ export function ProfileClient({ user }: ProfileClientProps) {
     localStorage.setItem("sm_theme", theme);
     localStorage.setItem("sm_accent", accent);
 
+    // Trigger global style update via event
+    window.dispatchEvent(new Event("sm-settings-changed"));
+
     // Dynamic visual notification
     showAutoDismissSuccess("Görünüm ayarları başarıyla güncellendi.");
-
-    // Apply basic dark/light theme to document if needed
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
   };
 
   const handleToggle = (key: string, value: boolean, setter: (val: boolean) => void) => {
