@@ -116,6 +116,7 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
   const hasCreds = hasPlatformOAuthCredentials(platform);
   const allowSim =
     forceLocal ||
+    !hasCreds ||
     process.env.ALLOW_LOCAL_OAUTH_SIM === "true" ||
     process.env.NODE_ENV !== "production";
   const wantRealOAuth =
