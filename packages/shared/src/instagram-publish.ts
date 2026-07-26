@@ -8,9 +8,23 @@ function isLocalToken(token: string) {
   );
 }
 
+export type IgFormat = "post" | "story" | "reel";
+
+export function parseIgFormat(content: string): IgFormat {
+  const m = content.match(/\[Format\]:\s*(POST|STORY|REEL)/i);
+  if (!m) return "post";
+  return m[1].toLowerCase() as IgFormat;
+}
+
+export function stripIgMarkers(content: string): string {
+  return content
+    .replace(/\n*\s*\[Format\]:\s*(POST|STORY|REEL)\s*/gi, "")
+    .replace(/\n*\s*\[İlk yorum\]:[\s\S]*$/i, "")
+    .trim();
+}
+
 /**
- * Instagram Graph API — image or reel via public URL or uploaded media URL.
- * providerAccountId = Instagram Business/Creator user id.
+ * Instagram Graph API — feed image, Reels, or Stories via public HTTPS URL.
  */
 export async function publishInstagram(params: {
   accessToken: string;
@@ -26,30 +40,46 @@ export async function publishInstagram(params: {
     };
   }
 
+  const format = parseIgFormat(params.content);
+  const caption = stripIgMarkers(params.content).slice(0, 2200);
   const igUserId = params.providerAccountId;
-  const caption = params.content.slice(0, 2200);
   let mediaUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
 
-  // Prefer HTTPS public URL; Graph API needs a reachable URL for containers
   if (!mediaUrl) {
     return {
       success: false,
       errorMessage:
-        "Instagram için herkese açık HTTPS medya URL’si gerekli (Blob/R2). Yerel dosya ile yayınlanamaz.",
+        "Instagram için herkese açık HTTPS medya URL’si gerekli (Blob/R2).",
     };
   }
 
-  const isVideo = /\.(mp4|mov|webm)(\?|$)/i.test(mediaUrl) || mediaUrl.includes("video");
+  if ((format === "story" || format === "reel") && !mediaUrl) {
+    return {
+      success: false,
+      errorMessage: `Instagram ${format === "story" ? "Hikâye" : "Reel"} için medya gerekli`,
+    };
+  }
+
+  const isVideo =
+    /\.(mp4|mov|webm)(\?|$)/i.test(mediaUrl) ||
+    mediaUrl.includes("video") ||
+    format === "reel";
 
   const createBody = new URLSearchParams();
   createBody.set("access_token", params.accessToken);
-  createBody.set("caption", caption);
-  if (isVideo) {
+
+  if (format === "story") {
+    createBody.set("media_type", "STORIES");
+    if (isVideo) createBody.set("video_url", mediaUrl);
+    else createBody.set("image_url", mediaUrl);
+  } else if (format === "reel" || isVideo) {
     createBody.set("media_type", "REELS");
     createBody.set("video_url", mediaUrl);
     createBody.set("share_to_feed", "true");
+    if (caption) createBody.set("caption", caption);
   } else {
     createBody.set("image_url", mediaUrl);
+    if (caption) createBody.set("caption", caption);
   }
 
   const createRes = await fetch(
@@ -73,12 +103,14 @@ export async function publishInstagram(params: {
 
   const creationId = createData.id;
 
-  // Poll until finished (esp. video)
   for (let i = 0; i < 30; i++) {
     const st = await fetch(
       `https://graph.facebook.com/v19.0/${encodeURIComponent(creationId)}?fields=status_code&access_token=${encodeURIComponent(params.accessToken)}`,
     );
-    const stData = (await st.json()) as { status_code?: string; error?: { message?: string } };
+    const stData = (await st.json()) as {
+      status_code?: string;
+      error?: { message?: string };
+    };
     if (stData.status_code === "FINISHED" || stData.status_code === "PUBLISHED") break;
     if (stData.status_code === "ERROR" || stData.error) {
       return {

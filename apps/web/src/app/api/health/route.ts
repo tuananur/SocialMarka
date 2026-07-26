@@ -38,6 +38,7 @@ export async function GET() {
         normalizeCredValue(process.env.FACEBOOK_APP_ID) &&
           normalizeCredValue(process.env.FACEBOOK_APP_SECRET),
       ),
+      BLOB_READ_WRITE_TOKEN: Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim()),
     },
     readyProviders: ready,
   });

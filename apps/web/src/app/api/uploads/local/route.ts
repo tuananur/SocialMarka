@@ -6,6 +6,7 @@ import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { prisma } from "@socialmarka/db";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const ctx = await getWorkspaceContext();

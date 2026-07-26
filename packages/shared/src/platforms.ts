@@ -27,7 +27,7 @@ export const CONNECTABLE_PLATFORMS: {
   { id: "LINKEDIN", name: "LinkedIn", description: "Şirket sayfası ve kişisel profil" },
   { id: "YOUTUBE", name: "YouTube", description: "Video ve Shorts yayınlama" },
   { id: "X", name: "X (Twitter)", description: "Tweet ve medya paylaşımı" },
-  { id: "TIKTOK", name: "TikTok", description: "Kısa video yayınlama" },
+  { id: "TIKTOK", name: "TikTok", description: "Kısa video ve fotoğraf yayınlama" },
   { id: "PINTEREST", name: "Pinterest", description: "Pin ve board yönetimi" },
   { id: "GBP", name: "Google Business Profile", description: "İşletme profili (yakında)" },
 ];

@@ -2,12 +2,22 @@ import path from "path";
 import { access, readFile } from "fs/promises";
 import { prisma, PostStatus, TargetStatus } from "@socialmarka/db";
 import {
-  decryptToken,
   encryptToken,
   getPlatformAdapter,
+  postFirstComment,
+  resolveAccessToken,
+  type PlatformType,
   type PublishMediaFile,
 } from "@socialmarka/shared";
 
+function extractFirstComment(content: string): { caption: string; firstComment: string | null } {
+  const m = content.match(/\n*\s*\[İlk yorum\]:\s*([\s\S]+)$/i);
+  if (!m) return { caption: content, firstComment: null };
+  return {
+    caption: content.replace(/\n*\s*\[İlk yorum\]:\s*[\s\S]+$/i, "").trim(),
+    firstComment: m[1].trim() || null,
+  };
+}
 /**
  * Publish one post target immediately (used on Vercel when Redis/worker is unavailable).
  */
@@ -31,13 +41,20 @@ export async function publishPostTargetInline(opts: {
   let accessToken = "stub-token";
   if (account.encryptedAccessToken) {
     try {
-      accessToken = decryptToken(account.encryptedAccessToken);
-    } catch {
+      accessToken = resolveAccessToken(account.encryptedAccessToken);
+      if (account.status === "REQUIRES_REAUTH" && !accessToken.startsWith("sm_access_")) {
+        await prisma.socialAccount.update({
+          where: { id: account.id },
+          data: { status: "CONNECTED" },
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Token çözülemedi";
       await prisma.postTarget.update({
         where: { id: postTargetId },
         data: {
           status: TargetStatus.FAILED,
-          errorMessage: "Token çözülemedi. Yeniden yetkilendirme gerekli.",
+          errorMessage: msg,
         },
       });
       await prisma.socialAccount.update({
@@ -45,7 +62,7 @@ export async function publishPostTargetInline(opts: {
         data: { status: "REQUIRES_REAUTH" },
       });
       await refreshPostStatus(postId);
-      return { success: false as const, error: "Token çözülemedi" };
+      return { success: false as const, error: msg };
     }
   }
 
@@ -55,7 +72,7 @@ export async function publishPostTargetInline(opts: {
     !accessToken.startsWith("sm_access_")
   ) {
     try {
-      const refreshToken = decryptToken(account.encryptedRefreshToken);
+      const refreshToken = resolveAccessToken(account.encryptedRefreshToken);
       const tokenAdapter = getPlatformAdapter(account.provider);
       if (tokenAdapter.refreshToken) {
         const refreshed = await tokenAdapter.refreshToken(refreshToken);
@@ -93,7 +110,9 @@ export async function publishPostTargetInline(opts: {
   }
 
   const adapter = getPlatformAdapter(account.provider);
-  const content = target.platformContent || target.post.content;
+  const rawContent = target.platformContent || target.post.content;
+  const { caption, firstComment } = extractFirstComment(rawContent);
+  const content = caption;
   const mediaUrls = target.post.media.map((m) => m.originalUrl);
   const mediaFiles: PublishMediaFile[] = [];
 
@@ -102,8 +121,43 @@ export async function publishPostTargetInline(opts: {
     if (loaded) mediaFiles.push(loaded);
   }
 
+  // Format media checks
+  const formatMatch = content.match(/\[Format\]:\s*(STORY|REEL)/i);
   if (
-    (account.provider === "YOUTUBE" || account.provider === "TIKTOK") &&
+    (account.provider === "INSTAGRAM" || account.provider === "FACEBOOK") &&
+    formatMatch &&
+    mediaFiles.length === 0 &&
+    !mediaUrls.some((u) => /^https?:\/\//i.test(u))
+  ) {
+    await prisma.postTarget.update({
+      where: { id: postTargetId },
+      data: {
+        status: TargetStatus.FAILED,
+        errorMessage: `${account.provider} ${formatMatch[1]} için medya gerekli.`,
+      },
+    });
+    await refreshPostStatus(postId);
+    return { success: false as const, error: "Medya yok" };
+  }
+
+  if (
+    account.provider === "YOUTUBE" &&
+    !mediaFiles.some((f) => f.mimeType.startsWith("video/")) &&
+    !mediaUrls.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u) || u.startsWith("data:video"))
+  ) {
+    await prisma.postTarget.update({
+      where: { id: postTargetId },
+      data: {
+        status: TargetStatus.FAILED,
+        errorMessage: "YOUTUBE için video medyası gerekli.",
+      },
+    });
+    await refreshPostStatus(postId);
+    return { success: false as const, error: "Medya yok" };
+  }
+
+  if (
+    account.provider === "TIKTOK" &&
     mediaFiles.length === 0 &&
     !mediaUrls.some((u) => /^https?:\/\//i.test(u) || u.startsWith("data:"))
   ) {
@@ -111,7 +165,7 @@ export async function publishPostTargetInline(opts: {
       where: { id: postTargetId },
       data: {
         status: TargetStatus.FAILED,
-        errorMessage: `${account.provider} için video medyası gerekli.`,
+        errorMessage: "TikTok için video veya görsel ekleyin.",
       },
     });
     await refreshPostStatus(postId);
@@ -127,13 +181,31 @@ export async function publishPostTargetInline(opts: {
   });
 
   if (result.success) {
+    let errorNote: string | null = null;
+    if (firstComment && result.remotePostId) {
+      try {
+        const commentResult = await postFirstComment({
+          platform: account.provider as PlatformType,
+          accessToken,
+          providerAccountId: account.providerAccountId,
+          remotePostId: result.remotePostId,
+          comment: firstComment,
+        });
+        if (!commentResult.success) {
+          errorNote = `Yayınlandı; ilk yorum: ${commentResult.errorMessage || "başarısız"}`;
+        }
+      } catch (e) {
+        errorNote = `Yayınlandı; ilk yorum: ${e instanceof Error ? e.message : "hata"}`;
+      }
+    }
+
     await prisma.postTarget.update({
       where: { id: postTargetId },
       data: {
         status: TargetStatus.PUBLISHED,
         publishedAt: new Date(),
         remotePostId: result.remotePostId,
-        errorMessage: null,
+        errorMessage: errorNote,
       },
     });
   } else {

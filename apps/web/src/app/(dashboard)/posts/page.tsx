@@ -44,7 +44,7 @@ export default async function PostsPage() {
         },
       },
       orderBy: { updatedAt: "desc" },
-      take: 100,
+      take: 200,
     }),
     prisma.accountGroup.findMany({
       where: { workspaceId },

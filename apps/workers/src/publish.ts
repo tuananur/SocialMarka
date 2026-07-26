@@ -8,9 +8,9 @@ import {
 } from "@socialmarka/queue";
 import { prisma, PostStatus, TargetStatus } from "@socialmarka/db";
 import {
-  decryptToken,
   encryptToken,
   getPlatformAdapter,
+  resolveAccessToken,
   type PublishMediaFile,
 } from "@socialmarka/shared";
 
@@ -38,13 +38,20 @@ const worker = new Worker<PublishJobData>(
     let accessToken = "stub-token";
     if (account.encryptedAccessToken) {
       try {
-        accessToken = decryptToken(account.encryptedAccessToken);
-      } catch {
+        accessToken = resolveAccessToken(account.encryptedAccessToken);
+        if (account.status === "REQUIRES_REAUTH" && !accessToken.startsWith("sm_access_")) {
+          await prisma.socialAccount.update({
+            where: { id: account.id },
+            data: { status: "CONNECTED" },
+          });
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Token çözülemedi";
         await prisma.postTarget.update({
           where: { id: postTargetId },
           data: {
             status: TargetStatus.FAILED,
-            errorMessage: "Token çözülemedi. Yeniden yetkilendirme gerekli.",
+            errorMessage: msg,
           },
         });
         await prisma.socialAccount.update({
@@ -63,7 +70,7 @@ const worker = new Worker<PublishJobData>(
       !accessToken.startsWith("sm_access_")
     ) {
       try {
-        const refreshToken = decryptToken(account.encryptedRefreshToken);
+        const refreshToken = resolveAccessToken(account.encryptedRefreshToken);
         const tokenAdapter = getPlatformAdapter(account.provider);
         if (!tokenAdapter.refreshToken) throw new Error("Token yenileme yok");
         const refreshed = await tokenAdapter.refreshToken(refreshToken);

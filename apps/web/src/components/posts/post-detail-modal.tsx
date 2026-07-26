@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { PostPreview } from "./post-preview";
 import { ProviderIcon } from "./provider-icon";
 import {
   type ManagePost,
+  postIsVideo,
   postPreviewPlatform,
+  postPrimaryError,
   postStatusLabel,
+  postStatusTone,
   postThumbnail,
 } from "@/lib/post-display";
 
@@ -19,6 +21,7 @@ type Props = {
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onRetry?: () => void;
 };
 
 export function PostDetailModal({
@@ -28,11 +31,13 @@ export function PostDetailModal({
   onClose,
   onEdit,
   onDelete,
+  onRetry,
 }: Props) {
-  const [commentTab, setCommentTab] = useState<"team" | "public">("team");
   const thumb = postThumbnail(post);
+  const isVideo = postIsVideo(post);
   const platform = postPreviewPlatform(post);
   const when = post.scheduledAt ? new Date(post.scheduledAt) : null;
+  const error = postPrimaryError(post);
 
   if (variant === "compact") {
     const account = post.targets[0]?.socialAccount;
@@ -41,12 +46,22 @@ export function PostDetailModal({
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
           <div className="shrink-0">
             {thumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={thumb}
-                alt=""
-                className="h-28 w-28 rounded-lg border border-ink-200 object-cover sm:h-32 sm:w-32"
-              />
+              isVideo ? (
+                <video
+                  src={thumb}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="h-28 w-28 rounded-lg border border-ink-200 object-cover sm:h-32 sm:w-32"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={thumb}
+                  alt=""
+                  className="h-28 w-28 rounded-lg border border-ink-200 object-cover sm:h-32 sm:w-32"
+                />
+              )
             ) : (
               <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-ink-100 text-xs text-ink-400 sm:h-32 sm:w-32">
                 Medya yok
@@ -57,16 +72,33 @@ export function PostDetailModal({
             <div className="mb-2 flex flex-wrap items-center gap-2">
               {account ? <ProviderIcon provider={account.provider} size={22} /> : null}
               <span className="text-sm font-semibold text-ink-900">{account?.accountName}</span>
-              <span className="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700">
+              <span
+                className={`rounded-md px-2 py-0.5 text-xs font-semibold ${postStatusTone(post.status)}`}
+              >
                 {postStatusLabel(post.status)}
               </span>
             </div>
             {when ? (
               <p className="mb-2 text-xs text-ink-500">
-                📅 {format(when, "HH:mm, d MMMM yyyy", { locale: tr })}
+                {format(when, "HH:mm, d MMMM yyyy", { locale: tr })}
               </p>
             ) : null}
             <p className="whitespace-pre-wrap text-sm text-ink-800">{post.content}</p>
+            {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+            {post.targets.length > 1 ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {post.targets.map((t) => (
+                  <span
+                    key={t.id}
+                    className="inline-flex items-center gap-1 rounded-full border border-ink-100 bg-ink-50 px-2 py-0.5 text-[11px] font-medium text-ink-700"
+                  >
+                    <ProviderIcon provider={t.socialAccount.provider} size={14} />
+                    {t.socialAccount.accountName}
+                    <span className="text-ink-400">· {postStatusLabel(t.status)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {canEdit && onEdit ? (
                 <button
@@ -75,6 +107,15 @@ export function PostDetailModal({
                   className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm font-semibold text-ink-700 hover:bg-ink-50"
                 >
                   Düzenle
+                </button>
+              ) : null}
+              {canEdit && onRetry ? (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent/15"
+                >
+                  Tekrar dene
                 </button>
               ) : null}
             </div>
@@ -94,19 +135,30 @@ export function PostDetailModal({
         <div className="min-h-0 overflow-y-auto border-b border-ink-200 p-4 lg:border-b-0 lg:border-r">
           <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-ink-800">Gönderi önizlemesi</p>
-            {canEdit && onEdit ? (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm font-semibold text-ink-700 shadow-sm hover:bg-ink-50"
-              >
-                ✎ Düzenle
-              </button>
-            ) : null}
+            <div className="flex gap-2">
+              {canEdit && onRetry ? (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 text-sm font-semibold text-accent"
+                >
+                  Tekrar dene
+                </button>
+              ) : null}
+              {canEdit && onEdit ? (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm font-semibold text-ink-700 shadow-sm hover:bg-ink-50"
+                >
+                  Düzenle
+                </button>
+              ) : null}
+            </div>
           </div>
           <PostPreview platform={platform} text={post.content} mediaUrl={thumb} />
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-ink-500">
-            <span className="rounded-md bg-ink-100 px-2 py-1 font-medium">
+            <span className={`rounded-md px-2 py-1 font-medium ${postStatusTone(post.status)}`}>
               {postStatusLabel(post.status)}
             </span>
             {when ? (
@@ -115,55 +167,30 @@ export function PostDetailModal({
               <span>Tarih yok</span>
             )}
           </div>
+          {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
           <div className="mt-3 flex flex-wrap gap-2">
             {post.targets.map((t) => (
               <span
                 key={t.id}
-                className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-ink-50 px-2 py-1 text-xs font-medium text-ink-700"
+                className="inline-flex max-w-full flex-col gap-0.5 rounded-xl border border-ink-100 bg-ink-50 px-2 py-1.5 text-xs font-medium text-ink-700"
               >
-                <ProviderIcon provider={t.socialAccount.provider} size={18} />
-                {t.socialAccount.accountName}
+                <span className="inline-flex items-center gap-1.5">
+                  <ProviderIcon provider={t.socialAccount.provider} size={18} />
+                  {t.socialAccount.accountName}
+                  <span className="text-ink-400">· {postStatusLabel(t.status)}</span>
+                </span>
+                {t.errorMessage ? (
+                  <span className="pl-6 text-[11px] font-normal text-rose-600">{t.errorMessage}</span>
+                ) : null}
               </span>
             ))}
           </div>
         </div>
-        <div className="flex min-h-[240px] flex-col bg-[#fafbfc] lg:min-h-0">
-          <p className="border-b border-ink-200 px-4 py-3 text-sm font-semibold text-ink-800">
-            Yorumlar
+        <div className="flex min-h-[200px] flex-col bg-[#fafbfc] p-4 lg:min-h-0">
+          <p className="mb-2 text-sm font-semibold text-ink-800">Hesap hedefleri</p>
+          <p className="text-sm text-ink-500">
+            Bu gönderinin yayın durumu yukarıdaki hesap satırlarında görünür. Yorum özelliği yakında.
           </p>
-          <div className="flex-1 overflow-y-auto p-4">
-            <p className="text-center text-sm text-ink-400">Henüz yorum yok.</p>
-          </div>
-          <div className="border-t border-ink-200 p-4">
-            <div className="mb-2 flex gap-1 rounded-lg bg-ink-100/80 p-1">
-              {(["team", "public"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setCommentTab(tab)}
-                  className={`flex-1 rounded-md py-1.5 text-xs font-semibold ${
-                    commentTab === tab ? "bg-white text-ink-900 shadow-sm" : "text-ink-500"
-                  }`}
-                >
-                  {tab === "team" ? "Ekip" : "Herkese açık"}
-                </button>
-              ))}
-            </div>
-            <textarea
-              className="min-h-[72px] w-full resize-none rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-accent"
-              placeholder="Yanıt yazın…"
-              disabled
-            />
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                disabled
-                className="rounded-lg bg-accent/40 px-4 py-1.5 text-sm font-semibold text-white"
-              >
-                Gönder
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </ModalShell>
@@ -200,7 +227,7 @@ function ModalShell({
                 onClick={onDelete}
                 className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
               >
-                🗑
+                Sil
               </button>
             ) : null}
             <button

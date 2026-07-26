@@ -6,6 +6,7 @@ export * from "./x-publish";
 export * from "./tiktok-publish";
 export * from "./instagram-publish";
 export * from "./pinterest-publish";
+export * from "./first-comment";
 
 export const QUEUE_NAMES = {
   PUBLISH: "publish",

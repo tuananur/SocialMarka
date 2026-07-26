@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { generateClientTokenFromReadWriteToken } from "@vercel/blob/client";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { prisma } from "@socialmarka/db";
 import { enqueueMedia } from "@socialmarka/queue";
@@ -44,11 +45,14 @@ export async function POST(req: Request) {
     if (!post) return NextResponse.json({ error: "Gönderi bulunamadı" }, { status: 404 });
   }
 
-  const key = `uploads/${ctx.workspaceId}/${randomUUID()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
+  const key = `uploads/${ctx.workspaceId}/${randomUUID()}-${safeName}`;
   const client = getR2Client();
 
   let uploadUrl: string | null = null;
   let publicUrl: string;
+  let blobClientToken: string | null = null;
+  let blobPathname: string | null = null;
 
   if (client && process.env.R2_BUCKET_NAME) {
     const command = new PutObjectCommand({
@@ -60,10 +64,29 @@ export async function POST(req: Request) {
     publicUrl = process.env.R2_PUBLIC_URL
       ? `${process.env.R2_PUBLIC_URL.replace(/\/$/, "")}/${key}`
       : uploadUrl.split("?")[0];
-  } else {
-    // Client will POST bytes to /api/uploads/local (disk or Vercel Blob)
+  } else if (process.env.BLOB_READ_WRITE_TOKEN) {
+    // Client uploads directly to Vercel Blob (avoids 4.5MB serverless body limit)
     publicUrl = `/uploads/pending/${randomUUID()}`;
-    uploadUrl = null;
+    blobPathname = key;
+    try {
+      blobClientToken = await generateClientTokenFromReadWriteToken({
+        pathname: key,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        allowedContentTypes: ["image/*", "video/*", "application/octet-stream"],
+        maximumSizeInBytes: 100 * 1024 * 1024,
+        addRandomSuffix: true,
+        validUntil: Date.now() + 60 * 60 * 1000,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Blob token hatası";
+      return NextResponse.json(
+        { error: `Depolama token üretilemedi: ${msg}` },
+        { status: 500 },
+      );
+    }
+  } else {
+    // Client will POST bytes to /api/uploads/local (disk / data-URL fallback)
+    publicUrl = `/uploads/pending/${randomUUID()}`;
   }
 
   const asset = await prisma.mediaAsset.create({
@@ -85,6 +108,9 @@ export async function POST(req: Request) {
     assetId: asset.id,
     uploadUrl,
     publicUrl,
-    stub: !uploadUrl,
+    stub: !uploadUrl && !blobClientToken,
+    useBlobClient: Boolean(blobClientToken),
+    blobClientToken,
+    blobPathname,
   });
 }

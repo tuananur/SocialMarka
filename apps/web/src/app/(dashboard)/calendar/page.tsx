@@ -6,18 +6,22 @@ import { PanelSkeleton } from "@/components/dashboard/panel-skeleton";
 
 const CalendarView = dynamic(
   () => import("@/components/calendar/calendar-view").then((m) => m.CalendarView),
-  { loading: () => <PanelSkeleton /> }
+  { loading: () => <PanelSkeleton /> },
 );
 
 export default async function CalendarPage() {
   const { workspaceId, role } = await requireWorkspace();
+
+  // Window around now so upcoming posts aren't dropped by take+oldest-first
+  const from = new Date();
+  from.setMonth(from.getMonth() - 2);
+  const to = new Date();
+  to.setMonth(to.getMonth() + 6);
+
   const posts = await prisma.post.findMany({
     where: {
       workspaceId,
-      OR: [
-        { scheduledAt: { not: null } },
-        { status: { in: ["PUBLISHED", "FAILED", "PARTIAL_FAILED", "SCHEDULED"] } },
-      ],
+      scheduledAt: { not: null, gte: from, lte: to },
     },
     select: {
       id: true,
@@ -27,6 +31,7 @@ export default async function CalendarPage() {
       media: {
         select: { id: true, thumbnailUrl: true, originalUrl: true, mimeType: true },
         take: 1,
+        orderBy: { createdAt: "asc" },
       },
       targets: {
         select: {
@@ -34,13 +39,13 @@ export default async function CalendarPage() {
           status: true,
           errorMessage: true,
           socialAccount: {
-            select: { accountName: true, provider: true },
+            select: { id: true, accountName: true, provider: true },
           },
         },
       },
     },
     orderBy: { scheduledAt: "asc" },
-    take: 200,
+    take: 500,
   });
 
   return <CalendarView posts={toClientJson(posts)} canEdit={canEditContent(role)} />;

@@ -30,13 +30,34 @@ export async function POST(
     data: { status: TargetStatus.PENDING, errorMessage: null },
   });
 
-  const targets = await prisma.postTarget.findMany({
-    where: { postId: post.id, status: TargetStatus.PENDING },
-    include: { socialAccount: { select: { provider: true } } },
+  // Also retry accounts wrongly marked REQUIRES_REAUTH after token-key issues
+  await prisma.socialAccount.updateMany({
+    where: {
+      id: { in: post.targets.map((t) => t.socialAccountId) },
+      status: "REQUIRES_REAUTH",
+    },
+    data: { status: "CONNECTED" },
   });
 
-  const results: { provider: string; success: boolean; error?: string; remotePostId?: string }[] =
-    [];
+  const targets = await prisma.postTarget.findMany({
+    where: { postId: post.id, status: TargetStatus.PENDING },
+    include: { socialAccount: { select: { provider: true, accountName: true } } },
+  });
+
+  if (targets.length === 0) {
+    return NextResponse.json(
+      { error: "Paylaşılacak hedef yok. En az bir hesap seçili olmalı." },
+      { status: 400 },
+    );
+  }
+
+  const results: {
+    provider: string;
+    accountName?: string;
+    success: boolean;
+    error?: string;
+    remotePostId?: string;
+  }[] = [];
 
   for (const t of targets) {
     const r = await publishPostTargetInline({
@@ -45,6 +66,7 @@ export async function POST(
     });
     results.push({
       provider: t.socialAccount.provider,
+      accountName: t.socialAccount.accountName,
       success: !!r.success,
       error: "error" in r ? r.error : r.errorMessage,
       remotePostId: "remotePostId" in r ? r.remotePostId : undefined,
@@ -74,5 +96,10 @@ export async function POST(
     results,
     post: updated,
     status: updated?.status || PostStatus.SCHEDULED,
+    summary: {
+      success: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      pending: 0,
+    },
   });
 }

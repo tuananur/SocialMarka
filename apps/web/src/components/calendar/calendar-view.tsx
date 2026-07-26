@@ -19,7 +19,9 @@ import { ProviderIcon } from "@/components/posts/provider-icon";
 import { PostDetailModal } from "@/components/posts/post-detail-modal";
 import {
   type ManagePost,
+  postIsVideo,
   postStatusLabel,
+  postStatusTone,
   postThumbnail,
 } from "@/lib/post-display";
 
@@ -27,11 +29,20 @@ type Post = ManagePost;
 
 type View = "list" | "day" | "week" | "month";
 
+const STATUS_FILTERS = [
+  { id: "ALL", label: "Tümü" },
+  { id: "SCHEDULED", label: "Zamanlandı" },
+  { id: "PUBLISHED", label: "Yayınlandı" },
+  { id: "FAILED", label: "Hatalı" },
+] as const;
+
 export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdit?: boolean }) {
   const router = useRouter();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(new Date());
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [providerFilter, setProviderFilter] = useState<string>("ALL");
   const [detailPost, setDetailPost] = useState<Post | null>(null);
 
   const views: { id: View; label: string }[] = [
@@ -41,15 +52,40 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
     { id: "month", label: "Ay" },
   ];
 
+  const providers = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of posts) {
+      for (const t of p.targets) set.add(t.socialAccount.provider);
+    }
+    return Array.from(set).sort();
+  }, [posts]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return posts;
-    return posts.filter((p) => p.content.toLowerCase().includes(q));
-  }, [posts, search]);
+    return posts.filter((p) => {
+      if (q && !p.content.toLowerCase().includes(q)) return false;
+      if (statusFilter === "FAILED") {
+        if (p.status !== "FAILED" && p.status !== "PARTIAL_FAILED") return false;
+      } else if (statusFilter !== "ALL" && p.status !== statusFilter) {
+        return false;
+      }
+      if (providerFilter !== "ALL") {
+        if (!p.targets.some((t) => t.socialAccount.provider === providerFilter)) return false;
+      }
+      return true;
+    });
+  }, [posts, search, statusFilter, providerFilter]);
+
+  const listPosts = useMemo(() => {
+    if (view !== "list") return filtered;
+    return filtered.filter(
+      (p) => p.scheduledAt && isSameMonth(new Date(p.scheduledAt), cursor),
+    );
+  }, [filtered, view, cursor]);
 
   const dayPosts = useMemo(
     () => filtered.filter((p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), cursor)),
-    [filtered, cursor]
+    [filtered, cursor],
   );
 
   const weekStart = startOfWeek(cursor, { weekStartsOn: 1 });
@@ -65,6 +101,11 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
 
   const monthLabel = format(cursor, "MMMM yyyy", { locale: tr });
 
+  function openDay(day: Date) {
+    setCursor(day);
+    setView("day");
+  }
+
   return (
     <div className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-ink-200/80 pb-3">
@@ -78,7 +119,9 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
             size="sm"
             onPress={() =>
               setCursor((c) =>
-                view === "month" ? addMonths(c, -1) : addDays(c, view === "day" ? -1 : -7)
+                view === "month" || view === "list"
+                  ? addMonths(c, -1)
+                  : addDays(c, view === "day" ? -1 : -7),
               )
             }
           >
@@ -92,14 +135,18 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
             size="sm"
             onPress={() =>
               setCursor((c) =>
-                view === "month" ? addMonths(c, 1) : addDays(c, view === "day" ? 1 : 7)
+                view === "month" || view === "list"
+                  ? addMonths(c, 1)
+                  : addDays(c, view === "day" ? 1 : 7),
               )
             }
           >
             →
           </Button>
           <span className="min-w-[8rem] px-2 text-center text-sm font-semibold capitalize">
-            {view === "month" ? monthLabel : format(cursor, "d MMMM yyyy", { locale: tr })}
+            {view === "month" || view === "list"
+              ? monthLabel
+              : format(cursor, "d MMMM yyyy", { locale: tr })}
           </span>
           <div className="flex gap-1 rounded-lg border border-ink-200 bg-white p-0.5">
             {views.map((v) => (
@@ -126,12 +173,44 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <div className="flex flex-wrap gap-1">
+          {STATUS_FILTERS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setStatusFilter(s.id)}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                statusFilter === s.id
+                  ? "bg-ink-900 text-white"
+                  : "bg-ink-50 text-ink-600 hover:bg-ink-100"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {providers.length > 0 ? (
+          <select
+            className="rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-ink-700"
+            value={providerFilter}
+            onChange={(e) => setProviderFilter(e.target.value)}
+          >
+            <option value="ALL">Tüm platformlar</option>
+            {providers.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
 
       {view === "list" && (
         <div className="space-y-2">
-          {filtered.length === 0 && <Empty>Takvimde gönderi yok.</Empty>}
-          {filtered.map((p) => (
+          {listPosts.length === 0 && (
+            <Empty>Bu ayda planlı gönderi yok. ← → ile ay değiştirin.</Empty>
+          )}
+          {listPosts.map((p) => (
             <CalendarListRow key={p.id} post={p} onOpen={() => setDetailPost(p)} />
           ))}
         </div>
@@ -148,19 +227,26 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
 
       {view === "week" && (
         <div className="min-w-0 overflow-x-auto overscroll-x-contain pb-1">
+          {filtered.every((p) => !p.scheduledAt) ? (
+            <Empty>Haftalık görünümde gösterilecek planlı gönderi yok.</Empty>
+          ) : null}
           <div className="grid min-w-[52rem] gap-2 md:min-w-0 md:grid-cols-7">
             {weekDays.map((day) => {
               const items = filtered.filter(
-                (p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), day)
+                (p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), day),
               );
               return (
                 <div
                   key={day.toISOString()}
                   className="min-h-[200px] min-w-0 rounded-xl border border-ink-200/80 bg-white p-2"
                 >
-                  <div className="mb-2 text-xs font-semibold text-ink-500">
+                  <button
+                    type="button"
+                    onClick={() => openDay(day)}
+                    className="mb-2 text-left text-xs font-semibold text-ink-500 hover:text-accent"
+                  >
                     {format(day, "EEE d", { locale: tr })}
-                  </div>
+                  </button>
                   <div className="space-y-1.5">
                     {items.map((p) => (
                       <CalendarCellPost key={p.id} post={p} onOpen={() => setDetailPost(p)} />
@@ -185,11 +271,11 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
                   >
                     {d}
                   </div>
-                )
+                ),
               )}
               {monthDays.map((day) => {
                 const items = filtered.filter(
-                  (p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), day)
+                  (p) => p.scheduledAt && isSameDay(new Date(p.scheduledAt), day),
                 );
                 const inMonth = isSameMonth(day, cursor);
                 return (
@@ -199,8 +285,10 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
                       inMonth ? "bg-white" : "bg-ink-50/50"
                     }`}
                   >
-                    <div
-                      className={`mb-1 text-[11px] font-semibold ${
+                    <button
+                      type="button"
+                      onClick={() => openDay(day)}
+                      className={`mb-1 text-[11px] font-semibold hover:text-accent ${
                         inMonth ? "text-ink-700" : "text-ink-400"
                       }`}
                     >
@@ -210,13 +298,24 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
                           {format(day, "MMM", { locale: tr })}
                         </span>
                       ) : null}
-                    </div>
+                    </button>
                     <div className="space-y-1">
                       {items.slice(0, 4).map((p) => (
-                        <CalendarCellPost key={p.id} post={p} compact onOpen={() => setDetailPost(p)} />
+                        <CalendarCellPost
+                          key={p.id}
+                          post={p}
+                          compact
+                          onOpen={() => setDetailPost(p)}
+                        />
                       ))}
                       {items.length > 4 ? (
-                        <p className="text-[10px] font-medium text-accent">+{items.length - 4} daha</p>
+                        <button
+                          type="button"
+                          onClick={() => openDay(day)}
+                          className="text-[10px] font-medium text-accent hover:underline"
+                        >
+                          +{items.length - 4} daha
+                        </button>
                       ) : null}
                     </div>
                   </div>
@@ -254,12 +353,10 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 function CalendarListRow({ post, onOpen }: { post: Post; onOpen: () => void }) {
   const thumb = postThumbnail(post);
-  const mime = post.media?.[0]?.mimeType || "";
-  const isVideo =
-    mime.startsWith("video/") ||
-    Boolean(thumb && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(thumb));
+  const isVideo = postIsVideo(post);
   const when = post.scheduledAt ? new Date(post.scheduledAt) : null;
   const account = post.targets[0]?.socialAccount;
+  const extra = Math.max(0, post.targets.length - 1);
 
   return (
     <button
@@ -285,12 +382,17 @@ function CalendarListRow({ post, onOpen }: { post: Post; onOpen: () => void }) {
       )}
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-sm text-ink-800">{post.content}</p>
-        <p className="text-xs text-ink-500">
-          {when ? format(when, "d MMM yyyy HH:mm", { locale: tr }) : "—"} ·{" "}
-          {postStatusLabel(post.status)}
+        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-500">
+          <span>{when ? format(when, "d MMM yyyy HH:mm", { locale: tr }) : "—"}</span>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${postStatusTone(post.status)}`}>
+            {postStatusLabel(post.status)}
+          </span>
         </p>
       </div>
-      {account ? <ProviderIcon provider={account.provider} size={20} /> : null}
+      <div className="flex shrink-0 items-center gap-1">
+        {account ? <ProviderIcon provider={account.provider} size={20} /> : null}
+        {extra > 0 ? <span className="text-[10px] font-semibold text-ink-400">+{extra}</span> : null}
+      </div>
     </button>
   );
 }
@@ -305,12 +407,10 @@ function CalendarCellPost({
   onOpen: () => void;
 }) {
   const thumb = postThumbnail(post);
-  const mime = post.media?.[0]?.mimeType || "";
-  const isVideo =
-    mime.startsWith("video/") ||
-    Boolean(thumb && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(thumb));
+  const isVideo = postIsVideo(post);
   const when = post.scheduledAt ? new Date(post.scheduledAt) : null;
   const account = post.targets[0]?.socialAccount;
+  const extra = Math.max(0, post.targets.length - 1);
   const title = post.content.trim().split("\n")[0] || "Gönderi";
   const thumbClass = `shrink-0 rounded object-cover ${compact ? "h-7 w-7" : "h-9 w-9"}`;
 
@@ -323,6 +423,9 @@ function CalendarCellPost({
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-1">
           {account ? <ProviderIcon provider={account.provider} size={14} /> : null}
+          {extra > 0 ? (
+            <span className="text-[9px] font-semibold text-ink-400">+{extra}</span>
+          ) : null}
           <span className="truncate text-[10px] font-semibold text-ink-700">
             {account?.accountName || "Hesap"}
           </span>
@@ -341,9 +444,13 @@ function CalendarCellPost({
               <img src={thumb} alt="" className={thumbClass} />
             )
           ) : (
-            <div className={`shrink-0 rounded bg-ink-200 ${compact ? "h-7 w-7" : "h-9 w-9"}`} />
+            <div
+              className={`shrink-0 rounded ${postStatusTone(post.status)} ${compact ? "h-7 w-7" : "h-9 w-9"}`}
+            />
           )}
-          <p className={`line-clamp-2 flex-1 text-ink-700 ${compact ? "text-[9px] leading-tight" : "text-[10px] leading-snug"}`}>
+          <p
+            className={`line-clamp-2 flex-1 text-ink-700 ${compact ? "text-[9px] leading-tight" : "text-[10px] leading-snug"}`}
+          >
             {title}
           </p>
         </div>
