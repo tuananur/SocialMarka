@@ -13,6 +13,7 @@ const allNav = [
   { href: "/accounts", label: "Hesaplar", hint: "Sosyal bağlantılar", roles: null },
   { href: "/inbox", label: "Gelen Kutusu", hint: "Yorum ve DM", roles: null },
   { href: "/analytics", label: "Analitik", hint: "Performans", roles: null },
+  { href: "/profile", label: "Profilim", hint: "Tema ve ayarlar", roles: null },
 ];
 
 export function DashboardShell({
@@ -39,7 +40,8 @@ export function DashboardShell({
     pathname.startsWith("/posts") ||
     pathname.startsWith("/calendar") ||
     pathname.startsWith("/accounts") ||
-    pathname.startsWith("/analytics");
+    pathname.startsWith("/analytics") ||
+    pathname.startsWith("/profile");
 
   const isAdmin = user.role === "SYSTEM_ADMIN" || user.role === "ADMIN";
 
