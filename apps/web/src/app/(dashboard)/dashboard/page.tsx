@@ -3,9 +3,10 @@ import { prisma } from "@socialmarka/db";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 
 export default async function OverviewDashboardPage() {
-  const { workspaceId, session } = await requireWorkspace();
+  const { workspaceId, session, role } = await requireWorkspace();
   const now = new Date();
   const startOf30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60_000);
+  const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60_000);
 
   // 1. Post count grouped by status
   const postCounts = await prisma.post.groupBy({
@@ -199,16 +200,66 @@ export default async function OverviewDashboardPage() {
     count,
   }));
 
+  // 7. Get upcoming scheduled posts for the next 7 days
+  const upcomingPosts = await prisma.post.findMany({
+    where: {
+      workspaceId,
+      status: { in: ["SCHEDULED", "PENDING_REVIEW"] },
+      scheduledAt: { gte: now, lte: weekAhead },
+      isDeleted: false,
+    },
+    select: {
+      id: true,
+      content: true,
+      status: true,
+      scheduledAt: true,
+      targets: {
+        select: {
+          socialAccount: { select: { provider: true, accountName: true } },
+        },
+        take: 4,
+      },
+    },
+    orderBy: { scheduledAt: "asc" },
+    take: 5,
+  });
+
+  // 8. Get recent posts activity
+  const recentPosts = await prisma.post.findMany({
+    where: { workspaceId, isDeleted: false },
+    select: {
+      id: true,
+      content: true,
+      status: true,
+      updatedAt: true,
+      targets: {
+        select: { socialAccount: { select: { provider: true } } },
+        take: 3,
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 5,
+  });
+
   const userName = session.user?.name || "Kullanıcı";
 
   return (
     <DashboardClient
       userName={userName}
+      role={role}
       summary={summary}
       chartData={chartData}
       accounts={accountsWithStats}
       groups={groupsWithStats}
       inboxes={inboxesWithStats}
+      upcomingPosts={upcomingPosts.map(p => ({
+        ...p,
+        scheduledAt: p.scheduledAt ? p.scheduledAt.toISOString() : null,
+      }))}
+      recentPosts={recentPosts.map(p => ({
+        ...p,
+        updatedAt: p.updatedAt.toISOString(),
+      }))}
     />
   );
 }

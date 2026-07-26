@@ -39,8 +39,29 @@ type InboxStats = {
   unreadCount: number;
 };
 
+type UpcomingPost = {
+  id: string;
+  content: string;
+  status: string;
+  scheduledAt: string | null;
+  targets: {
+    socialAccount: { provider: string; accountName: string };
+  }[];
+};
+
+type RecentPost = {
+  id: string;
+  content: string;
+  status: string;
+  updatedAt: string;
+  targets: {
+    socialAccount: { provider: string };
+  }[];
+};
+
 type DashboardClientProps = {
   userName: string;
+  role: string;
   summary: {
     queuedCount: number;
     deliveredCount: number;
@@ -51,6 +72,8 @@ type DashboardClientProps = {
   accounts: AccountStats[];
   groups: GroupStats[];
   inboxes: InboxStats[];
+  upcomingPosts: UpcomingPost[];
+  recentPosts: RecentPost[];
 };
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -65,11 +88,14 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 export function DashboardClient({
   userName,
+  role,
   summary,
   chartData,
   accounts,
   groups,
   inboxes,
+  upcomingPosts,
+  recentPosts,
 }: DashboardClientProps) {
   const [filterType, setFilterType] = useState("current");
 
@@ -83,6 +109,30 @@ export function DashboardClient({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const statusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      DRAFT: "Taslak",
+      SCHEDULED: "Zamanlandı",
+      PENDING_REVIEW: "Onay bekliyor",
+      PUBLISHED: "Yayınlandı",
+      FAILED: "Başarısız",
+      PARTIAL_FAILED: "Kısmi hata",
+    };
+    return map[status] || status;
+  };
+
+  const statusColor = (status: string) => {
+    const map: Record<string, string> = {
+      DRAFT: "bg-ink-100 text-ink-700",
+      SCHEDULED: "bg-blue-100 text-blue-700",
+      PENDING_REVIEW: "bg-amber-100 text-amber-700",
+      PUBLISHED: "bg-green-100 text-green-700",
+      FAILED: "bg-rose-100 text-rose-700",
+      PARTIAL_FAILED: "bg-orange-100 text-orange-700",
+    };
+    return map[status] || "bg-ink-100 text-ink-700";
   };
 
   return (
@@ -208,6 +258,59 @@ export function DashboardClient({
         </div>
       </div>
 
+      {/* Hızlı Kısayol Linkleri */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <Link
+          href="/posts"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+        >
+          <span className="text-sm font-bold text-ink-900">Gönderiler</span>
+          <span className="text-[10px] text-ink-400 mt-0.5">Oluştur & Yönet</span>
+        </Link>
+        <Link
+          href="/calendar"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+        >
+          <span className="text-sm font-bold text-ink-900">Takvim</span>
+          <span className="text-[10px] text-ink-400 mt-0.5">Haftalık Akış</span>
+        </Link>
+        <Link
+          href="/accounts"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+        >
+          <span className="text-sm font-bold text-ink-900">Hesaplar</span>
+          <span className="text-[10px] text-ink-400 mt-0.5">{accounts.length} Bağlı Profil</span>
+        </Link>
+        <Link
+          href="/analytics"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+        >
+          <span className="text-sm font-bold text-ink-900">Analitik</span>
+          <span className="text-[10px] text-ink-400 mt-0.5">Gösterim & Takipçi</span>
+        </Link>
+        <Link
+          href="/inbox"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+        >
+          <span className="text-sm font-bold text-ink-900">Mesajlar</span>
+          <span className="text-[10px] text-ink-400 mt-0.5">Sosyal Gelen Kutusu</span>
+        </Link>
+        {role === "ADMIN" || role === "SYSTEM_ADMIN" ? (
+          <Link
+            href="/admin"
+            className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+          >
+            <span className="text-sm font-bold text-ink-900">Yönetim</span>
+            <span className="text-[10px] text-ink-400 mt-0.5">Ekip & Sistem</span>
+          </Link>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-100 bg-ink-50/30 text-center">
+            <span className="text-sm font-semibold text-ink-400">SocialMarka</span>
+            <span className="text-[10px] text-ink-300 mt-0.5">Üye Yetkisi</span>
+          </div>
+        )}
+      </div>
+
       {/* Yayınlama Trendleri Grafiği */}
       <section className="rounded-2xl border border-ink-200/60 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -277,8 +380,9 @@ export function DashboardClient({
 
       {/* İki Sütunlu Detay Tabloları */}
       <div className="grid gap-8 xl:grid-cols-12">
-        {/* Hesap Bazlı Yayın Durumu */}
+        {/* Sol Sütun: Hesap ve Grup yayınları */}
         <div className="xl:col-span-8 space-y-6">
+          {/* Hesap Bazlı Yayın Durumu */}
           <section className="rounded-2xl border border-ink-200/60 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-lg font-bold text-ink-950">Hesap Bazlı Yayın Durumu</h2>
@@ -403,8 +507,9 @@ export function DashboardClient({
           </section>
         </div>
 
-        {/* Sağ Panel: Gelen Kutusu (Social Inbox) */}
+        {/* Sağ Sütun: Gelen Kutusu ve Ekstralar */}
         <div className="xl:col-span-4 space-y-6">
+          {/* Sosyal Gelen Kutusu */}
           <section className="rounded-2xl border border-ink-200/60 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-lg font-bold text-ink-950">Sosyal Gelen Kutusu</h2>
@@ -470,6 +575,99 @@ export function DashboardClient({
             </div>
           </section>
         </div>
+      </div>
+
+      {/* Eski Panelden Taşınan Kullanışlı Bölümler: Yaklaşan ve Son Gönderiler */}
+      <div className="grid gap-8 xl:grid-cols-2">
+        {/* Yaklaşan Yayınlar (7 Günlük Liste) */}
+        <section className="rounded-2xl border border-ink-200/60 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-display text-lg font-bold text-ink-950">Yaklaşan Yayınlar</h2>
+              <p className="text-xs text-ink-400">Önümüzdeki 7 günde zamanlanmış olanlar</p>
+            </div>
+            <Link href="/calendar" className="text-xs font-semibold text-accent hover:underline">
+              Takvime Git
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {upcomingPosts.length === 0 ? (
+              <div className="py-8 text-center text-sm text-ink-400 border border-dashed border-ink-200 rounded-xl">
+                Önümüzdeki 7 gün için zamanlanmış gönderi yok.
+              </div>
+            ) : (
+              upcomingPosts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-start gap-4 rounded-xl border border-ink-100 bg-ink-50/20 p-3.5 hover:border-ink-200 transition"
+                >
+                  <div className="flex -space-x-1.5 pt-1">
+                    {p.targets.map((t, idx) => (
+                      <ProviderIcon key={idx} provider={t.socialAccount.provider} size={18} />
+                    ))}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink-800 line-clamp-1">
+                      {p.content || "Medya paylaşımı"}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-ink-400">
+                      <span>{formatDate(p.scheduledAt)}</span>
+                      <span>•</span>
+                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${statusColor(p.status)}`}>
+                        {statusLabel(p.status)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Son Gönderiler (Son Yapılan Paylaşımlar) */}
+        <section className="rounded-2xl border border-ink-200/60 bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-display text-lg font-bold text-ink-950">Güncel Gönderi Aktivitesi</h2>
+              <p className="text-xs text-ink-400">En son işlem yapılan gönderileriniz</p>
+            </div>
+            <Link href="/posts" className="text-xs font-semibold text-accent hover:underline">
+              Tüm Gönderiler
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {recentPosts.length === 0 ? (
+              <div className="py-8 text-center text-sm text-ink-400 border border-dashed border-ink-200 rounded-xl">
+                Henüz sosyal medya gönderisi oluşturulmamış.
+              </div>
+            ) : (
+              recentPosts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-start gap-4 rounded-xl border border-ink-100 bg-ink-50/20 p-3.5 hover:border-ink-200 transition"
+                >
+                  <div className="flex -space-x-1.5 pt-1">
+                    {p.targets.map((t, idx) => (
+                      <ProviderIcon key={idx} provider={t.socialAccount.provider} size={18} />
+                    ))}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-ink-800 line-clamp-1">
+                      {p.content || "Medya paylaşımı"}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-ink-400">
+                      <span>Güncellendi: {formatDate(p.updatedAt)}</span>
+                      <span>•</span>
+                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${statusColor(p.status)}`}>
+                        {statusLabel(p.status)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
