@@ -116,8 +116,8 @@ export function buildPlatformAuthorizeUrl(opts: {
     }
     case "TIKTOK": {
       if (!codeChallenge) return null;
-      // Login + Content Posting (direct post)
-      const scope = "user.info.basic,video.publish";
+      // Login + Content Posting (upload to drafts)
+      const scope = "user.info.basic,video.upload";
       return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc(scope)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "PINTEREST": {
