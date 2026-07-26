@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@socialmarka/db";
+import { prisma, PostStatus } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
-import { cancelJob, QUEUE_NAMES } from "@socialmarka/queue";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function DELETE(_req: Request, { params }: Params) {
+export async function POST(_req: Request, { params }: Params) {
   const ctx = await getWorkspaceContext();
   if (!ctx) return NextResponse.json({ error: "Oturum gerekli" }, { status: 401 });
   if (!canEditContent(ctx.role)) {
@@ -18,29 +17,11 @@ export async function DELETE(_req: Request, { params }: Params) {
   });
   if (!post) return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
 
-  if (post.bullJobId) {
-    try {
-      await cancelJob(QUEUE_NAMES.PUBLISH, post.bullJobId);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  // Soft delete the post
   await prisma.post.update({
     where: { id },
     data: {
-      isDeleted: true,
-      bullJobId: null,
-    },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      action: "POST_DELETED",
-      details: { postId: id },
-      userId: ctx.userId,
-      workspaceId: ctx.workspaceId,
+      isDeleted: false,
+      status: PostStatus.DRAFT, // Restore as draft
     },
   });
 

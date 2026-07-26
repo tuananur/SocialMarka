@@ -65,7 +65,7 @@ const worker = new Worker<PublishJobData>(
 
     // Kısa ömürlü OAuth tokenları yayın öncesi yenile
     if (
-      (account.provider === "YOUTUBE" || account.provider === "X") &&
+      (account.provider === "YOUTUBE" || account.provider === "X" || account.provider === "TIKTOK" || account.provider === "PINTEREST") &&
       account.encryptedRefreshToken &&
       !accessToken.startsWith("sm_access_")
     ) {

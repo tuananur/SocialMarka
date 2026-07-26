@@ -50,7 +50,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
   );
 
   const draftText =
-    activePlatform === "ORIGINAL" ? content : platformContents[activePlatform] ?? "";
+    activePlatform === "ORIGINAL" ? content : platformContents[activePlatform] || content;
   const charCount = draftText.length;
   const charLimit = charLimitFor(activePlatform);
   const showFormatTabs =
@@ -74,9 +74,18 @@ export function useComposerState(accounts: ComposerAccount[]) {
 
   const setDraftText = useCallback(
     (value: string) => {
-      if (activePlatform === "ORIGINAL") setContent(value);
-      else {
-        setPlatformContents((prev) => ({ ...prev, [activePlatform]: value }));
+      if (activePlatform === "ORIGINAL") {
+        setContent(value);
+      } else {
+        if (value === "") {
+          setPlatformContents((prev) => {
+            const copy = { ...prev };
+            delete copy[activePlatform];
+            return copy;
+          });
+        } else {
+          setPlatformContents((prev) => ({ ...prev, [activePlatform]: value }));
+        }
         if (!content.trim()) setContent(value);
       }
     },
@@ -129,7 +138,8 @@ export function useComposerState(accounts: ComposerAccount[]) {
   function loadFromPost(post: ManagePost & { targets: { platformContent?: string | null; socialAccount: ComposerAccount }[] }) {
     resetCompose();
     setEditingId(post.id);
-    setContent(stripComposerMarkers(post.content));
+    const originalClean = stripComposerMarkers(post.content);
+    setContent(originalClean);
     const pc: Record<string, string> = {};
     const fc: Record<string, string> = {};
     const formats: Partial<Record<"FACEBOOK" | "INSTAGRAM", PostFormat>> = {
@@ -142,7 +152,10 @@ export function useComposerState(accounts: ComposerAccount[]) {
       if (raw) {
         const commentMatch = raw.match(/\[İlk yorum\]:\s*([\s\S]+)$/i);
         if (commentMatch) fc[provider] = commentMatch[1].trim();
-        pc[provider] = stripComposerMarkers(raw);
+        const cleaned = stripComposerMarkers(raw);
+        if (cleaned !== originalClean) {
+          pc[provider] = cleaned;
+        }
         const fmt = raw.match(/\[Format\]:\s*(POST|STORY|REEL)/i);
         if (fmt && (provider === "FACEBOOK" || provider === "INSTAGRAM")) {
           formats[provider] = fmt[1].toLowerCase() as PostFormat;

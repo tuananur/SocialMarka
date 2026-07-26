@@ -1,12 +1,12 @@
-import type { PlatformAdapter, PlatformType, PublishResult } from "./platforms";
+import type { PlatformAdapter, PlatformType, PublishResult, PublishMediaFile } from "./platforms";
 import {
   publishYouTubeVideo,
   refreshGoogleAccessToken,
 } from "./youtube-publish";
 import { publishXPost, refreshXAccessToken } from "./x-publish";
-import { publishTikTokVideo } from "./tiktok-publish";
+import { publishTikTokVideo, refreshTikTokAccessToken } from "./tiktok-publish";
 import { publishInstagram } from "./instagram-publish";
-import { publishPinterestPin } from "./pinterest-publish";
+import { publishPinterestPin, refreshPinterestAccessToken } from "./pinterest-publish";
 
 function isLocalToken(token: string) {
   return (
@@ -22,6 +22,7 @@ async function publishLinkedIn(params: {
   providerAccountId: string;
   content: string;
   mediaUrls?: string[];
+  mediaFiles?: PublishMediaFile[];
 }): Promise<PublishResult> {
   if (isLocalToken(params.accessToken)) {
     return {
@@ -35,25 +36,100 @@ async function publishLinkedIn(params: {
     ? params.providerAccountId
     : `urn:li:person:${params.providerAccountId}`;
 
-  const imageUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
-  let text = params.content;
-  if (imageUrl && !params.content.includes(imageUrl)) {
-    text = `${params.content}\n\n${imageUrl}`.trim();
+  let imageFile = params.mediaFiles?.find((f) => f.mimeType.startsWith("image/"));
+
+  if (!imageFile && params.mediaUrls?.length) {
+    const imageUrl = params.mediaUrls.find((u) => /^https?:\/\//i.test(u) && !/\.(mp4|mov|webm)(\?|$)/i.test(u));
+    if (imageUrl) {
+      try {
+        const res = await fetch(imageUrl);
+        if (res.ok) {
+          imageFile = {
+            buffer: Buffer.from(await res.arrayBuffer()),
+            mimeType: res.headers.get("content-type") || "image/jpeg",
+          };
+        }
+      } catch {
+        /* ignore fallback fetch error */
+      }
+    }
   }
 
-  const body = {
+  let mediaAssetUrn: string | null = null;
+
+  if (imageFile) {
+    try {
+      const registerRes = await fetch("https://api.linkedin.com/v2/assets?action=registerUpload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${params.accessToken}`,
+          "Content-Type": "application/json",
+          "X-Restli-Protocol-Version": "2.0.0",
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
+            owner: authorUrn,
+            supportedUploadMechanisms: ["SYNCHRONOUS_UPLOAD"],
+          },
+        }),
+      });
+
+      const registerData = await registerRes.json();
+      if (!registerRes.ok || !registerData.value?.uploadMechanism?.["com.linkedin.ads.common.S3UploadMechanism"]?.uploadUrl) {
+        throw new Error(registerData.message || "Görsel yükleme kaydı başarısız");
+      }
+
+      const uploadUrl = registerData.value.uploadMechanism["com.linkedin.ads.common.S3UploadMechanism"].uploadUrl;
+      mediaAssetUrn = registerData.value.asset;
+
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${params.accessToken}`,
+          "Content-Type": imageFile.mimeType || "image/jpeg",
+        },
+        body: imageFile.buffer as any,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Görsel binary yükleme başarısız");
+      }
+    } catch (err) {
+      console.error("[linkedin-publish] image upload failed, falling back to link sharing:", err);
+      mediaAssetUrn = null;
+    }
+  }
+
+  const body: any = {
     author: authorUrn,
     lifecycleState: "PUBLISHED",
     specificContent: {
       "com.linkedin.ugc.ShareContent": {
-        shareCommentary: { text },
-        shareMediaCategory: "NONE",
+        shareCommentary: { text: params.content },
+        shareMediaCategory: mediaAssetUrn ? "IMAGE" : "NONE",
       },
     },
     visibility: {
       "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
     },
   };
+
+  if (mediaAssetUrn) {
+    body.specificContent["com.linkedin.ugc.ShareContent"].media = [
+      {
+        status: "READY",
+        media: mediaAssetUrn,
+        title: { text: "SocialMarka Post" },
+      },
+    ];
+  } else {
+    const firstUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
+    if (firstUrl && !params.content.includes(firstUrl)) {
+      body.specificContent["com.linkedin.ugc.ShareContent"].shareCommentary.text =
+        `${params.content}\n\n${firstUrl}`.trim();
+    }
+  }
 
   const res = await fetch("https://api.linkedin.com/v2/ugcPosts", {
     method: "POST",
@@ -233,6 +309,22 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
       }
       if (platform === "X") {
         const refreshed = await refreshXAccessToken(refreshToken);
+        return {
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+          expiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
+        };
+      }
+      if (platform === "TIKTOK") {
+        const refreshed = await refreshTikTokAccessToken(refreshToken);
+        return {
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+          expiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
+        };
+      }
+      if (platform === "PINTEREST") {
+        const refreshed = await refreshPinterestAccessToken(refreshToken);
         return {
           accessToken: refreshed.accessToken,
           refreshToken: refreshed.refreshToken,

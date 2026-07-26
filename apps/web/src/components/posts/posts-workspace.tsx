@@ -31,6 +31,7 @@ const listTabs = [
   { id: "FAILED", label: "Hatalı" },
   { id: "PUBLISHED", label: "Yayınlanan" },
   { id: "PENDING_REVIEW", label: "Onay Bekleyen" },
+  { id: "DELETED", label: "Silinenler" },
 ];
 
 export function PostsWorkspace({
@@ -77,6 +78,11 @@ export function PostsWorkspace({
   const filteredPosts = posts.filter((p) => {
     const q = postSearch.trim().toLowerCase();
     if (q && !p.content.toLowerCase().includes(q)) return false;
+    if (listTab === "DELETED") {
+      return !!(p as any).isDeleted;
+    }
+    if ((p as any).isDeleted) return false;
+
     if (listTab === "FAILED") return p.status === "FAILED" || p.status === "PARTIAL_FAILED";
     if (listTab === "DRAFT") return p.status === "DRAFT";
     return p.status === listTab;
@@ -86,6 +92,10 @@ export function PostsWorkspace({
     const counts: Record<string, number> = {};
     for (const t of listTabs) counts[t.id] = 0;
     for (const p of posts) {
+      if ((p as any).isDeleted) {
+        counts["DELETED"] = (counts["DELETED"] || 0) + 1;
+        continue;
+      }
       const tab = listTabForStatus(p.status);
       counts[tab] = (counts[tab] || 0) + 1;
     }
@@ -265,18 +275,36 @@ export function PostsWorkspace({
       const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Silinemedi");
-      setPosts((prev) => prev.filter((p) => p.id !== postId));
       if (detailPost?.id === postId) setDetailPost(null);
       if (composer.editingId === postId) {
         setMode("list");
         composer.resetCompose();
       }
-      setMessage("Gönderi silindi.");
+      setMessage("Gönderi silindi (Silinenler klasörüne taşındı).");
+      await refresh();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Silinemedi");
     } finally {
       setBusy(false);
       setDeleteConfirmId(null);
+    }
+  }
+
+  async function restorePost(postId: string) {
+    if (!canEdit) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/posts/${postId}/restore`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Geri yüklenemedi");
+      setMessage("Gönderi geri yüklendi (Taslak olarak kaydedildi).");
+      setListTab("DRAFT");
+      await refresh();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Geri yüklenemedi");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -503,6 +531,11 @@ export function PostsWorkspace({
                 post.status === "SCHEDULED" ||
                 post.status === "DRAFT")
                 ? () => void shareNow(post.id)
+                : undefined
+            }
+            onRestore={
+              canEdit && (post as any).isDeleted
+                ? () => void restorePost(post.id)
                 : undefined
             }
           />

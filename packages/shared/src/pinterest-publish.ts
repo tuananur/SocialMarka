@@ -95,3 +95,46 @@ export async function publishPinterestPin(params: {
 
   return { success: true, remotePostId: String(data.id || `pin_${Date.now()}`) };
 }
+
+export async function refreshPinterestAccessToken(refreshToken: string): Promise<{
+  accessToken: string;
+  expiresIn: number;
+  refreshToken?: string;
+}> {
+  const appId = process.env.PINTEREST_APP_ID?.trim();
+  const appSecret = process.env.PINTEREST_APP_SECRET?.trim();
+  if (!appId || !appSecret) {
+    throw new Error("PINTEREST_APP_ID / PINTEREST_APP_SECRET eksik");
+  }
+
+  const basic = Buffer.from(`${appId}:${appSecret}`).toString("base64");
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const res = await fetch("https://api.pinterest.com/v5/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body,
+  });
+  const data = (await res.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+    message?: string;
+  };
+
+  if (!res.ok || !data.access_token) {
+    throw new Error(data.message || "Pinterest token yenilenemedi");
+  }
+
+  return {
+    accessToken: data.access_token,
+    expiresIn: data.expires_in || 2592000,
+    refreshToken: data.refresh_token,
+  };
+}

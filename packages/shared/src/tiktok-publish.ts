@@ -347,3 +347,59 @@ async function fetchMedia(url: string): Promise<PublishMediaFile | null> {
     return null;
   }
 }
+
+export async function refreshTikTokAccessToken(refreshToken: string): Promise<{
+  accessToken: string;
+  expiresIn: number;
+  refreshToken?: string;
+}> {
+  const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim();
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET?.trim();
+  if (!clientKey || !clientSecret) {
+    throw new Error("TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET eksik");
+  }
+
+  const body = new URLSearchParams({
+    client_key: clientKey,
+    client_secret: clientSecret,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const res = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const raw = await res.text();
+  let data: {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+    error?: string;
+    error_description?: string;
+    data?: {
+      access_token?: string;
+      expires_in?: number;
+      refresh_token?: string;
+    };
+  } = {};
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error(`TikTok token yenileme hatası (${res.status}): ${raw.slice(0, 200)}`);
+  }
+
+  const tokenData = data.data || data;
+  if (!res.ok || !tokenData.access_token) {
+    throw new Error(
+      data.error_description || data.error || (data as any).message || "TikTok token yenilenemedi"
+    );
+  }
+
+  return {
+    accessToken: tokenData.access_token,
+    expiresIn: tokenData.expires_in || 86400,
+    refreshToken: tokenData.refresh_token,
+  };
+}

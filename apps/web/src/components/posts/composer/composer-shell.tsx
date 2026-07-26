@@ -349,6 +349,7 @@ export function ComposerShell({
                 platform={previewPlatform}
                 text={composer.draftText || composer.content}
                 mediaUrl={composer.mediaPreview}
+                mediaMime={composer.mediaMime}
               />
             ) : null}
             {rightTab === "comments" ? (
