@@ -367,46 +367,55 @@ async function exchangeInstagram(
   }
   console.log("[Instagram OAuth] Using App ID:", creds.clientId);
 
-  // 1. Exchange code at graph.facebook.com (using Instagram App ID/Secret)
-  const tokenUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
-  tokenUrl.searchParams.set("client_id", creds.clientId);
-  tokenUrl.searchParams.set("client_secret", creds.clientSecret);
-  tokenUrl.searchParams.set("redirect_uri", redirectUri);
-  tokenUrl.searchParams.set("code", code);
+  // 1. Short-lived token exchange via api.instagram.com
+  const tokenUrl = "https://api.instagram.com/oauth/access_token";
+  const body = new URLSearchParams({
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+    code,
+  });
 
-  console.log("[Instagram OAuth] Exchanging code...");
-  const tokenRes = await fetch(tokenUrl);
+  console.log("[Instagram OAuth] Exchanging code at api.instagram.com...");
+  const tokenRes = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+
   const token = await tokenRes.json();
   console.log("[Instagram OAuth] Exchange response:", {
     ok: tokenRes.ok,
     status: tokenRes.status,
     hasToken: !!token.access_token,
-    error: token.error || null,
+    error: token.error_message || token.error?.message || null,
   });
 
   if (!tokenRes.ok || !token.access_token) {
-    throw new Error(token.error?.message || "Instagram token alınamadı");
+    throw new Error(token.error_message || token.error?.message || "Instagram token alınamadı");
   }
 
   let userToken = String(token.access_token);
-  let expiresIn = Number(token.expires_in || 5184000) || undefined;
+  let expiresIn = 5184000; // 60 days fallback
 
-  // 2. Exchange for long-lived access token on graph.facebook.com
+  // 2. Exchange for long-lived access token on graph.instagram.com
   try {
-    const llUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
-    llUrl.searchParams.set("grant_type", "fb_exchange_token");
-    llUrl.searchParams.set("client_id", creds.clientId);
+    const llUrl = new URL("https://graph.instagram.com/access_token");
+    llUrl.searchParams.set("grant_type", "ig_exchange_token");
     llUrl.searchParams.set("client_secret", creds.clientSecret);
-    llUrl.searchParams.set("fb_exchange_token", userToken);
+    llUrl.searchParams.set("access_token", userToken);
     
-    console.log("[Instagram OAuth] Exchanging for long-lived token...");
+    console.log("[Instagram OAuth] Exchanging for long-lived token at graph.instagram.com...");
     const llRes = await fetch(llUrl);
     const ll = await llRes.json();
     console.log("[Instagram OAuth] Long-lived response:", {
       ok: llRes.ok,
       status: llRes.status,
       hasToken: !!ll.access_token,
-      error: ll.error || null,
+      error: ll.error_message || ll.error?.message || null,
     });
     if (llRes.ok && ll.access_token) {
       userToken = String(ll.access_token);
@@ -416,57 +425,29 @@ async function exchangeInstagram(
     console.error("[Instagram OAuth] Long-lived exchange error:", err?.message || err);
   }
 
-  // 3. Query the Instagram Business Accounts connected to this token on graph.facebook.com
-  try {
-    console.log("[Instagram OAuth] Querying instagram_business_accounts...");
-    const igRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/instagram_business_accounts?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(userToken)}`
-    );
-    const igData = await igRes.json();
-    console.log("[Instagram OAuth] instagram_business_accounts response:", {
-      ok: igRes.ok,
-      status: igRes.status,
-      dataCount: igData.data?.length || 0,
-      error: igData.error || null,
-    });
-    const ig = igData.data?.[0];
-    if (ig?.id) {
-      return {
-        accessToken: userToken,
-        expiresIn: expiresIn || 5184000,
-        providerAccountId: String(ig.id),
-        accountName: String(ig.username || ig.name),
-        profilePicUrl: ig.profile_picture_url,
-      };
-    }
-  } catch (err: any) {
-    console.error("[Instagram OAuth] instagram_business_accounts error:", err?.message || err);
-  }
-
-  // 4. Fallback to me endpoint on graph.facebook.com (asking ONLY for id and username)
-  console.log("[Instagram OAuth] Querying /me profile fallback...");
+  // 3. Query the Instagram profile using ONLY supported fields: id, username on graph.instagram.com
+  console.log("[Instagram OAuth] Querying profile at graph.instagram.com/me...");
   const meRes = await fetch(
-    `https://graph.facebook.com/v19.0/me?fields=id,username&access_token=${encodeURIComponent(userToken)}`
+    `https://graph.instagram.com/me?fields=id,username&access_token=${encodeURIComponent(userToken)}`
   );
   const me = await meRes.json();
-  console.log("[Instagram OAuth] /me profile response:", {
+  console.log("[Instagram OAuth] Profile response:", {
     ok: meRes.ok,
     status: meRes.status,
     id: me.id || null,
     username: me.username || null,
-    error: me.error || null,
+    error: me.error_message || me.error?.message || null,
   });
 
   if (!meRes.ok) {
-    throw new Error(me.error?.message || "Instagram profil okunamadı");
+    throw new Error(me.error_message || me.error?.message || "Instagram profil okunamadı");
   }
 
   return {
     accessToken: userToken,
-    expiresIn: expiresIn || 5184000,
-    providerAccountId: String(me.id),
+    expiresIn,
+    providerAccountId: String(me.id || token.user_id),
     accountName: String(me.username || "Instagram Account"),
-    profilePicUrl: undefined,
   };
 }
 
