@@ -14,6 +14,12 @@ const PROVIDERS: Record<string, PlatformType> = {
 };
 
 async function processWebhookInline(platform: PlatformType, payload: any) {
+  console.log("[Webhook Inline] Processing webhook event...", {
+    platform,
+    object: payload.object,
+    hasEntry: !!payload.entry,
+  });
+
   let senderName = String(payload.senderName || "Bilinmeyen");
   let messageText = String(payload.message || payload.text || "");
   let socialAccountId = String(payload.socialAccountId || "");
@@ -27,12 +33,31 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
     const entry = payload.entry?.[0];
     if (entry) {
       const igAccountId = String(entry.id);
-      const account = await prisma.socialAccount.findFirst({
-        where: {
-          provider: PlatformType.INSTAGRAM,
-          providerAccountId: igAccountId,
-          status: { not: AccountStatus.DISCONNECTED },
-        },
+      console.log("[Webhook Inline] Meta Instagram entry parsed:", { igAccountId });
+
+      let account;
+      if (igAccountId === "0") {
+        console.log("[Webhook Inline] Test payload detected (ID 0). Finding first active Instagram account...");
+        account = await prisma.socialAccount.findFirst({
+          where: {
+            provider: PlatformType.INSTAGRAM,
+            status: { not: AccountStatus.DISCONNECTED },
+          },
+        });
+      } else {
+        account = await prisma.socialAccount.findFirst({
+          where: {
+            provider: PlatformType.INSTAGRAM,
+            providerAccountId: igAccountId,
+            status: { not: AccountStatus.DISCONNECTED },
+          },
+        });
+      }
+
+      console.log("[Webhook Inline] DB Account lookup result:", {
+        found: !!account,
+        id: account?.id || null,
+        workspaceId: account?.workspaceId || null,
       });
 
       if (account) {
@@ -42,8 +67,9 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
         // Check for comments
         if (entry.changes?.[0]) {
           const change = entry.changes[0];
+          console.log("[Webhook Inline] change detail:", { field: change.field });
           if (change.field === "comments" && change.value) {
-            senderName = change.value.from?.username || "Instagram User";
+            senderName = change.value.from?.username || "instagram_user";
             messageText = change.value.text || "";
             remoteId = change.value.id || null;
             type = "COMMENT";
@@ -52,7 +78,7 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
         // Check for DMs
         else if (entry.messaging?.[0]) {
           const msg = entry.messaging[0];
-          senderName = msg.sender?.username || "Instagram User";
+          senderName = msg.sender?.username || "instagram_user";
           messageText = msg.message?.text || "";
           remoteId = msg.message?.mid || null;
           type = "DIRECT_MESSAGE";
@@ -60,6 +86,14 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
       }
     }
   }
+
+  console.log("[Webhook Inline] Final parsed fields:", {
+    socialAccountId,
+    workspaceId,
+    senderName,
+    messageText: messageText.slice(0, 30),
+    type,
+  });
 
   if (socialAccountId && workspaceId && messageText) {
     let conversation = await prisma.inboxConversation.findFirst({
@@ -71,6 +105,7 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
     });
 
     if (!conversation) {
+      console.log("[Webhook Inline] Creating new conversation...");
       conversation = await prisma.inboxConversation.create({
         data: {
           workspaceId,
@@ -84,6 +119,7 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
         },
       });
     } else {
+      console.log("[Webhook Inline] Updating existing conversation...", { id: conversation.id });
       await prisma.inboxConversation.update({
         where: { id: conversation.id },
         data: {
@@ -94,6 +130,7 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
       });
     }
 
+    console.log("[Webhook Inline] Creating inbox message...");
     await prisma.inboxMessage.create({
       data: {
         conversationId: conversation.id,
@@ -101,6 +138,9 @@ async function processWebhookInline(platform: PlatformType, payload: any) {
         messageText,
       },
     });
+    console.log("[Webhook Inline] Webhook processed successfully!");
+  } else {
+    console.warn("[Webhook Inline] Skipped DB write due to missing socialAccountId/workspaceId/messageText");
   }
 }
 
