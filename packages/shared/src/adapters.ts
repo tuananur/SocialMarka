@@ -347,6 +347,90 @@ export function getPlatformAdapter(platform: PlatformType): PlatformAdapter {
   return adapter;
 }
 
+export async function deleteRemotePost(params: {
+  platform: PlatformType;
+  accessToken: string;
+  remotePostId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const { platform, accessToken, remotePostId } = params;
+  if (!remotePostId || isLocalToken(accessToken)) {
+    return { success: true };
+  }
+
+  try {
+    switch (platform) {
+      case "FACEBOOK":
+      case "INSTAGRAM": {
+        const url = `https://graph.facebook.com/v19.0/${encodeURIComponent(remotePostId)}?access_token=${encodeURIComponent(accessToken)}`;
+        const res = await fetch(url, { method: "DELETE" });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok || json.success === true) {
+          return { success: true };
+        }
+        return { success: false, error: json.error?.message || "Meta gönderisi silinemedi" };
+      }
+
+      case "X": {
+        const res = await fetch(`https://api.twitter.com/2/tweets/${encodeURIComponent(remotePostId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (res.ok) return { success: true };
+        const json = await res.json().catch(() => ({}));
+        return { success: false, error: json.detail || json.title || "X gönderisi silinemedi" };
+      }
+
+      case "LINKEDIN": {
+        const targetUrn = remotePostId.startsWith("urn:")
+          ? remotePostId
+          : `urn:li:ugcPost:${remotePostId}`;
+        const res = await fetch(`https://api.linkedin.com/v2/ugcPosts/${encodeURIComponent(targetUrn)}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "X-Restli-Protocol-Version": "2.0.0",
+          },
+        });
+        if (res.ok) return { success: true };
+        return { success: false, error: "LinkedIn gönderisi silinemedi" };
+      }
+
+      case "YOUTUBE": {
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?id=${encodeURIComponent(remotePostId)}`,
+          {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        if (res.ok || res.status === 204) return { success: true };
+        const json = await res.json().catch(() => ({}));
+        return { success: false, error: json.error?.message || "YouTube videosu silinemedi" };
+      }
+
+      case "PINTEREST": {
+        const res = await fetch(`https://api.pinterest.com/v5/pins/${encodeURIComponent(remotePostId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (res.ok || res.status === 204) return { success: true };
+        const json = await res.json().catch(() => ({}));
+        return { success: false, error: json.message || "Pinterest pini silinemedi" };
+      }
+
+      case "TIKTOK": {
+        return { success: true };
+      }
+
+      default:
+        return { success: true };
+    }
+  } catch (err: any) {
+    console.error(`[deleteRemotePost] ${platform} error:`, err);
+    return { success: false, error: err.message || "Silme işlemi başarısız" };
+  }
+}
+
 /** Geriye uyumluluk */
 export function createStubAdapter(platform: PlatformType): PlatformAdapter {
   return createLiveAdapter(platform);
