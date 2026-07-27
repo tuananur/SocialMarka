@@ -362,39 +362,29 @@ async function exchangeInstagram(
   const creds = getPlatformCreds("INSTAGRAM");
   if (!creds) throw new Error("Instagram API anahtarları eksik");
 
-  // 1. Short-lived token exchange via api.instagram.com
-  const tokenUrl = "https://api.instagram.com/oauth/access_token";
-  const body = new URLSearchParams({
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
-    grant_type: "authorization_code",
-    redirect_uri: redirectUri,
-    code,
-  });
+  // 1. Exchange code at graph.facebook.com (using Instagram App ID/Secret)
+  const tokenUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
+  tokenUrl.searchParams.set("client_id", creds.clientId);
+  tokenUrl.searchParams.set("client_secret", creds.clientSecret);
+  tokenUrl.searchParams.set("redirect_uri", redirectUri);
+  tokenUrl.searchParams.set("code", code);
 
-  const tokenRes = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
-
+  const tokenRes = await fetch(tokenUrl);
   const token = await tokenRes.json();
   if (!tokenRes.ok || !token.access_token) {
-    throw new Error(token.error_message || token.error?.message || "Instagram token alınamadı");
+    throw new Error(token.error?.message || "Instagram token alınamadı");
   }
 
   let userToken = String(token.access_token);
-  let expiresIn = 5184000; // 60 days fallback
+  let expiresIn = Number(token.expires_in || 5184000) || undefined;
 
-  // 2. Exchange for long-lived access token on graph.instagram.com
+  // 2. Exchange for long-lived access token on graph.facebook.com
   try {
-    const llUrl = new URL("https://graph.instagram.com/access_token");
-    llUrl.searchParams.set("grant_type", "ig_exchange_token");
+    const llUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
+    llUrl.searchParams.set("grant_type", "fb_exchange_token");
+    llUrl.searchParams.set("client_id", creds.clientId);
     llUrl.searchParams.set("client_secret", creds.clientSecret);
-    llUrl.searchParams.set("access_token", userToken);
-
+    llUrl.searchParams.set("fb_exchange_token", userToken);
     const llRes = await fetch(llUrl);
     const ll = await llRes.json();
     if (llRes.ok && ll.access_token) {
@@ -405,21 +395,43 @@ async function exchangeInstagram(
     // Continue with short token
   }
 
-  // 3. Query the Instagram profile using ONLY supported fields: id, username
+  // 3. Query the Instagram Business Accounts connected to this token on graph.facebook.com
+  try {
+    const igRes = await fetch(
+      `https://graph.facebook.com/v19.0/me/instagram_business_accounts?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(userToken)}`
+    );
+    if (igRes.ok) {
+      const igData = await igRes.json();
+      const ig = igData.data?.[0];
+      if (ig?.id) {
+        return {
+          accessToken: userToken,
+          expiresIn: expiresIn || 5184000,
+          providerAccountId: String(ig.id),
+          accountName: String(ig.username || ig.name),
+          profilePicUrl: ig.profile_picture_url,
+        };
+      }
+    }
+  } catch {
+    // Fallback
+  }
+
+  // 4. Fallback to me endpoint on graph.facebook.com (asking ONLY for id and username)
   const meRes = await fetch(
-    `https://graph.instagram.com/me?fields=id,username&access_token=${encodeURIComponent(userToken)}`
+    `https://graph.facebook.com/v19.0/me?fields=id,username&access_token=${encodeURIComponent(userToken)}`
   );
   const me = await meRes.json();
   if (!meRes.ok) {
-    throw new Error(me.error_message || me.error?.message || "Instagram profil okunamadı");
+    throw new Error(me.error?.message || "Instagram profil okunamadı");
   }
 
   return {
     accessToken: userToken,
-    expiresIn,
-    providerAccountId: String(me.id || token.user_id),
+    expiresIn: expiresIn || 5184000,
+    providerAccountId: String(me.id),
     accountName: String(me.username || "Instagram Account"),
-    profilePicUrl: undefined, // Not supported by graph.instagram.com/me
+    profilePicUrl: undefined,
   };
 }
 
