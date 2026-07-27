@@ -98,7 +98,9 @@ export function buildPlatformAuthorizeUrl(opts: {
   switch (provider) {
     case "FACEBOOK": {
       const scope = "pages_show_list,pages_manage_posts,pages_read_engagement,business_management";
-      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
+      const configId = process.env.FACEBOOK_CONFIG_ID;
+      const configParam = configId ? `&config_id=${enc(configId)}` : "";
+      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code${configParam}`;
     }
     case "INSTAGRAM": {
       // Trigger rebuild to inject INSTAGRAM_APP_ID environment variable
