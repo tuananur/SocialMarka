@@ -224,7 +224,7 @@ async function fetchAllPages(userToken: string): Promise<any[]> {
   // 1. Query /me/accounts
   try {
     const res = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
+      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&limit=100&access_token=${encodeURIComponent(userToken)}`
     );
     const json = await res.json();
     console.log("[Facebook OAuth] /me/accounts response details:", {
@@ -240,7 +240,41 @@ async function fetchAllPages(userToken: string): Promise<any[]> {
     console.error("[Facebook OAuth] Fetch /me/accounts error:", err.message || err);
   }
 
-  // 2. Query /me/businesses (for Login for Business)
+  // 2. Query /me?fields=accounts
+  try {
+    const meAccRes = await fetch(
+      `https://graph.facebook.com/v19.0/me?fields=accounts{id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}}&access_token=${encodeURIComponent(userToken)}`
+    );
+    const meAccJson = await meAccRes.json();
+    console.log("[Facebook OAuth] /me?fields=accounts response:", {
+      ok: meAccRes.ok,
+      dataLength: meAccJson.accounts?.data?.length || 0,
+    });
+    if (meAccRes.ok && meAccJson.accounts?.data) {
+      addPages(meAccJson.accounts.data);
+    }
+  } catch (err: any) {
+    console.error("[Facebook OAuth] Fetch /me?fields=accounts error:", err.message || err);
+  }
+
+  // 3. Query /me/assigned_pages (Facebook Login for Business assigned assets)
+  try {
+    const assRes = await fetch(
+      `https://graph.facebook.com/v19.0/me/assigned_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
+    );
+    const assJson = await assRes.json();
+    console.log("[Facebook OAuth] /me/assigned_pages response:", {
+      ok: assRes.ok,
+      dataLength: assJson.data?.length || 0,
+    });
+    if (assRes.ok && assJson.data) {
+      addPages(assJson.data);
+    }
+  } catch (err: any) {
+    console.error("[Facebook OAuth] Fetch /me/assigned_pages error:", err.message || err);
+  }
+
+  // 4. Query /me/businesses (for Login for Business)
   try {
     const busRes = await fetch(
       `https://graph.facebook.com/v19.0/me/businesses?access_token=${encodeURIComponent(userToken)}`
@@ -390,7 +424,12 @@ async function exchangeFacebook(
     console.log("[Facebook OAuth] Total pages fetched:", allPages.length, allPages.map((p: any) => ({ id: p.id, name: p.name })));
 
     if (allPages.length > 0) {
-      let page = allPages.find((p: any) => p.name === "Jaglion" || p.id === "102151459388246");
+      let page = allPages.find(
+        (p: any) =>
+          p.name?.toLowerCase().includes("jaglion") ||
+          p.id === "102151459388246" ||
+          p.id === "431790324477711"
+      );
       if (!page) {
         page = allPages[0];
       }
@@ -450,7 +489,8 @@ async function exchangeFacebook(
         };
       }
     } else {
-      console.warn("[Facebook OAuth] No pages returned from Graph API, falling back to Facebook profile:", me.name);
+      console.warn("[Facebook OAuth] No pages returned from Graph API (/me/accounts, /me/assigned_pages).");
+      throw new Error("Facebook Sayfası bulunamadı. Lütfen Facebook giriş ekranında 'Jaglion' sayfasını işaretlediğinizden emin olun.");
     }
   }
 
