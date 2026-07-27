@@ -72,7 +72,19 @@ export function AnalyticsDashboard({
 
   const [platform, setPlatform] = useState<string>("ALL");
   const [accountId, setAccountId] = useState<string>("ALL");
-  const [range, setRange] = useState<"7" | "30" | "all">("30");
+  const [range, setRange] = useState<"7" | "30" | "all" | "custom">("30");
+  
+  const [customStartDate, setCustomStartDate] = useState<string>(() => {
+    const d = subDays(new Date(), 30);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+  
+  const [customEndDate, setCustomEndDate] = useState<string>(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
 
   const accountOptions = useMemo(() => {
     if (platform === "ALL") return accounts;
@@ -85,23 +97,34 @@ export function AnalyticsDashboard({
       ? accountId
       : "ALL";
 
-  const since = useMemo(() => {
-    if (range === "all") return new Date(0);
-    return subDays(new Date(), Number(range));
-  }, [range]);
+  const { since, until } = useMemo(() => {
+    if (range === "7") {
+      return { since: subDays(new Date(), 7), until: new Date() };
+    }
+    if (range === "30") {
+      return { since: subDays(new Date(), 30), until: new Date() };
+    }
+    if (range === "all") {
+      return { since: new Date(0), until: new Date() };
+    }
+    const start = customStartDate ? new Date(customStartDate + "T00:00:00") : new Date(0);
+    const end = customEndDate ? new Date(customEndDate + "T23:59:59") : new Date();
+    return { since: start, until: end };
+  }, [range, customStartDate, customEndDate]);
 
   const filteredSnapshots = useMemo(() => {
     return snapshots.filter((s) => {
       if (platform !== "ALL" && s.provider !== platform) return false;
       if (effectiveAccountId !== "ALL" && s.accountId !== effectiveAccountId) return false;
-      return isAfter(new Date(s.capturedAt), since);
+      const date = new Date(s.capturedAt);
+      return date >= since && date <= until;
     });
-  }, [snapshots, platform, effectiveAccountId, since]);
+  }, [snapshots, platform, effectiveAccountId, since, until]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((p) => {
       const d = new Date(p.scheduledAt || p.createdAt);
-      if (!isAfter(d, since)) return false;
+      if (d < since || d > until) return false;
       if (platform === "ALL" && effectiveAccountId === "ALL") return true;
       const targets = p.targets || [];
       return targets.some((t) => {
@@ -114,7 +137,7 @@ export function AnalyticsDashboard({
         return true;
       });
     });
-  }, [posts, since, platform, effectiveAccountId]);
+  }, [posts, since, until, platform, effectiveAccountId]);
 
   const latestByAccount = useMemo(() => {
     const map = new Map<string, Snapshot>();
@@ -213,12 +236,13 @@ export function AnalyticsDashboard({
             Platform ve hesap seçerek metrikleri filtreleyin · {selectedLabel}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {(
             [
               { id: "7", label: "Son 7 gün" },
               { id: "30", label: "Son 30 gün" },
               { id: "all", label: "Tümü" },
+              { id: "custom", label: "Özel Tarih" },
             ] as const
           ).map((r) => (
             <Button
@@ -230,6 +254,24 @@ export function AnalyticsDashboard({
               {r.label}
             </Button>
           ))}
+
+          {range === "custom" && (
+            <div className="flex items-center gap-1.5 bg-white border border-ink-200/80 p-1 rounded-xl shadow-sm">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="h-8 px-2 rounded-lg border-0 bg-transparent text-xs outline-none font-medium text-ink-700 focus:ring-0"
+              />
+              <span className="text-ink-300 text-xs">-</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="h-8 px-2 rounded-lg border-0 bg-transparent text-xs outline-none font-medium text-ink-700 focus:ring-0"
+              />
+            </div>
+          )}
         </div>
       </div>
 

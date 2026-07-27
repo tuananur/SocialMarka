@@ -86,7 +86,6 @@ async function publishLinkedIn(params: {
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${params.accessToken}`,
           "Content-Type": imageFile.mimeType || "image/jpeg",
         },
         body: imageFile.buffer as any,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input } from "@heroui/react";
 import { PostPreview } from "../post-preview";
 import { ComposerMediaPreview } from "../composer-media-preview";
@@ -67,6 +67,113 @@ export function ComposerShell({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rightTab, setRightTab] = useState<RightTab>("accounts");
+
+  const TIME_RANGES = useMemo(() => [
+    { id: "morning", label: "Sabah (09:00 - 12:00)", startHour: 9, endHour: 12 },
+    { id: "noon", label: "Öğle (12:00 - 15:00)", startHour: 12, endHour: 15 },
+    { id: "afternoon", label: "Öğleden Sonra (15:00 - 18:00)", startHour: 15, endHour: 18 },
+    { id: "evening", label: "Akşam (18:00 - 21:00)", startHour: 18, endHour: 21 },
+    { id: "night", label: "Gece (21:00 - 00:00)", startHour: 21, endHour: 24 },
+    { id: "latenight", label: "Gece Yarısı (00:00 - 09:00)", startHour: 0, endHour: 9 }
+  ], []);
+
+  const getRangeForTime = useCallback((timeStr: string) => {
+    if (!timeStr) return "morning";
+    const hour = parseInt(timeStr.split(":")[0], 10);
+    if (hour >= 9 && hour < 12) return "morning";
+    if (hour >= 12 && hour < 15) return "noon";
+    if (hour >= 15 && hour < 18) return "afternoon";
+    if (hour >= 18 && hour < 21) return "evening";
+    if (hour >= 21 && hour < 24) return "night";
+    return "latenight";
+  }, []);
+
+  const getTimeSlotsForRange = useCallback((rangeId: string) => {
+    const range = TIME_RANGES.find(r => r.id === rangeId);
+    if (!range) return [];
+    const slots: string[] = [];
+    const startHour = range.startHour;
+    const endHour = range.endHour;
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let min of [0, 15, 30, 45]) {
+        const hStr = String(hour).padStart(2, "0");
+        const mStr = String(min).padStart(2, "0");
+        slots.push(`${hStr}:${mStr}`);
+      }
+    }
+    if (endHour !== 24) {
+      slots.push(`${String(endHour).padStart(2, "0")}:00`);
+    } else {
+      slots.push("23:59");
+    }
+    return slots;
+  }, [TIME_RANGES]);
+
+  const getTodayDateString = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (composer.scheduledAt) return composer.scheduledAt.split("T")[0];
+    return getTodayDateString();
+  });
+
+  const [selectedRangeId, setSelectedRangeId] = useState(() => {
+    if (composer.scheduledAt) {
+      const t = composer.scheduledAt.split("T")[1] || "";
+      return getRangeForTime(t);
+    }
+    return "morning";
+  });
+
+  const [selectedTime, setSelectedTime] = useState(() => {
+    if (composer.scheduledAt) return composer.scheduledAt.split("T")[1] || "09:00";
+    return "09:00";
+  });
+
+  const setScheduledAt = composer.setScheduledAt;
+  const scheduledAtVal = composer.scheduledAt;
+
+  // Sync state from composer.scheduledAt
+  useEffect(() => {
+    if (scheduledAtVal) {
+      const parts = scheduledAtVal.split("T");
+      const d = parts[0] || "";
+      const t = parts[1] || "";
+      if (d !== selectedDate || t !== selectedTime) {
+        setSelectedDate(d);
+        setSelectedTime(t);
+        setSelectedRangeId(getRangeForTime(t));
+      }
+    } else {
+      const today = getTodayDateString();
+      setSelectedDate(today);
+      setSelectedTime("09:00");
+      setSelectedRangeId("morning");
+      setScheduledAt(`${today}T09:00`);
+    }
+  }, [scheduledAtVal, getRangeForTime, selectedDate, selectedTime, setScheduledAt]);
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    setScheduledAt(`${newDate}T${selectedTime}`);
+  };
+
+  const handleRangeChange = (newRangeId: string) => {
+    setSelectedRangeId(newRangeId);
+    const slots = getTimeSlotsForRange(newRangeId);
+    if (slots.length > 0) {
+      setSelectedTime(slots[0]);
+      setScheduledAt(`${selectedDate}T${slots[0]}`);
+    }
+  };
+
+  const handleTimeChange = (newTime: string) => {
+    setSelectedTime(newTime);
+    setScheduledAt(`${selectedDate}T${newTime}`);
+  };
 
   const previewPlatform = useMemo(() => {
     if (composer.activePlatform !== "ORIGINAL") return composer.activePlatform;
@@ -277,17 +384,72 @@ export function ComposerShell({
           ) : null}
 
           <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-ink-100 pt-4">
-            <div className="min-w-[220px] flex-1">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-ink-400">
+            <div className="flex flex-col gap-3 min-w-[280px] flex-1 bg-ink-50/50 p-4 rounded-xl border border-ink-200/60">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-ink-500">
                 Zamanlama
               </label>
-              <Input
-                type="datetime-local"
-                fullWidth
-                value={composer.scheduledAt}
-                onChange={(e) => composer.setScheduledAt(e.target.value)}
-                disabled={!canEdit}
-              />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Date Selection */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-ink-400 mb-1">
+                    Tarih
+                  </label>
+                  <Input
+                    type="date"
+                    fullWidth
+                    value={selectedDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </div>
+
+                {/* Hour Range (Saat Aralığı) Selection */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-ink-400 mb-1">
+                    Saat Aralığı
+                  </label>
+                  <select
+                    value={selectedRangeId}
+                    onChange={(e) => handleRangeChange(e.target.value)}
+                    disabled={!canEdit}
+                    className="w-full h-10 px-3 rounded-xl border border-ink-200 bg-white text-sm outline-none focus:border-accent disabled:opacity-60 font-medium"
+                  >
+                    {TIME_RANGES.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Exact Time Slot Selection */}
+              <div>
+                <label className="block text-[11px] font-semibold text-ink-400 mb-1.5">
+                  Zaman Seçin
+                </label>
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 max-h-[120px] overflow-y-auto pr-1">
+                  {getTimeSlotsForRange(selectedRangeId).map((slot) => {
+                    const isSelected = selectedTime === slot;
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => handleTimeChange(slot)}
+                        disabled={!canEdit}
+                        className={`py-1.5 px-2 text-xs font-semibold rounded-lg border text-center transition duration-150 ${
+                          isSelected
+                            ? "bg-accent border-accent text-white shadow-sm font-bold"
+                            : "bg-white border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300"
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
