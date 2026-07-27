@@ -386,73 +386,73 @@ async function exchangeFacebook(
 
   if (preferPage) {
     console.log("[Facebook OAuth] preferPage is true, fetching pages...");
-    try {
-      const allPages = await fetchAllPages(userToken);
+    const allPages = await fetchAllPages(userToken);
+    console.log("[Facebook OAuth] Total pages fetched:", allPages.length, allPages.map((p: any) => ({ id: p.id, name: p.name })));
 
+    if (allPages.length > 0) {
       let page = allPages.find((p: any) => p.name === "Jaglion" || p.id === "102151459388246");
-      if (!page && allPages.length > 0) {
+      if (!page) {
         page = allPages[0];
       }
 
-      if (page) {
-        console.log("[Facebook OAuth] Selected Page for connection:", {
-          id: page.id,
-          name: page.name,
-        });
+      console.log("[Facebook OAuth] Selected Page for connection:", {
+        id: page.id,
+        name: page.name,
+      });
 
-        const ig = page.instagram_business_account;
-        if (isInstagram && ig?.id) {
-          // Subscribe the Instagram business account
-          try {
-            const subUrl = new URL(`https://graph.facebook.com/v19.0/${ig.id}/subscribed_apps`);
-            subUrl.searchParams.set("subscribed_fields", "comments,messages");
-            subUrl.searchParams.set("access_token", page.access_token || userToken);
-            await fetch(subUrl.toString(), { method: "POST" });
-          } catch (subErr) {
-            console.error("[Facebook OAuth IG] Subscribed apps registration failed:", subErr);
-          }
-          // Subscribe the Facebook page as well (so we get both!)
-          try {
-            const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
-            subUrl.searchParams.set("subscribed_fields", "feed,messages");
-            subUrl.searchParams.set("access_token", page.access_token || userToken);
-            await fetch(subUrl.toString(), { method: "POST" });
-          } catch (subErr) {
-            console.error("[Facebook OAuth Page] Subscribed apps registration failed:", subErr);
-          }
-
-          return {
-            accessToken: page.access_token || userToken,
-            expiresIn: expiresIn || 5184000,
-            providerAccountId: String(ig.id),
-            accountName: String(ig.username || ig.name || page.name),
-            profilePicUrl: ig.profile_picture_url || page.picture?.data?.url,
-          };
-        } else if (!isInstagram) {
-          // Subscribe the Facebook page
-          try {
-            const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
-            subUrl.searchParams.set("subscribed_fields", "feed,messages");
-            subUrl.searchParams.set("access_token", page.access_token || userToken);
-            const subRes = await fetch(subUrl.toString(), { method: "POST" });
-            const subData = await subRes.json();
-            console.log("[Facebook OAuth Page] Subscribed apps registration response:", subData);
-          } catch (subErr) {
-            console.error("[Facebook OAuth Page Only] Subscribed apps registration failed:", subErr);
-          }
-
-          return {
-            accessToken: page.access_token || userToken,
-            expiresIn: expiresIn || 5184000,
-            providerAccountId: String(page.id),
-            accountName: String(page.name),
-            profilePicUrl: page.picture?.data?.url,
-          };
+      const ig = page.instagram_business_account;
+      if (isInstagram && ig?.id) {
+        // Subscribe the Instagram business account
+        try {
+          const subUrl = new URL(`https://graph.facebook.com/v19.0/${ig.id}/subscribed_apps`);
+          subUrl.searchParams.set("subscribed_fields", "comments,messages");
+          subUrl.searchParams.set("access_token", page.access_token || userToken);
+          await fetch(subUrl.toString(), { method: "POST" });
+        } catch (subErr) {
+          console.error("[Facebook OAuth IG] Subscribed apps registration failed:", subErr);
         }
+        // Subscribe the Facebook page as well (so we get both!)
+        try {
+          const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+          subUrl.searchParams.set("subscribed_fields", "feed,messages");
+          subUrl.searchParams.set("access_token", page.access_token || userToken);
+          await fetch(subUrl.toString(), { method: "POST" });
+        } catch (subErr) {
+          console.error("[Facebook OAuth Page] Subscribed apps registration failed:", subErr);
+        }
+
+        return {
+          accessToken: page.access_token || userToken,
+          expiresIn: expiresIn || 5184000,
+          providerAccountId: String(ig.id),
+          accountName: String(ig.username || ig.name || page.name),
+          profilePicUrl: ig.profile_picture_url || page.picture?.data?.url,
+        };
+      } else {
+        // Subscribe the Facebook page
+        try {
+          const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+          subUrl.searchParams.set("subscribed_fields", "feed,messages");
+          subUrl.searchParams.set("access_token", page.access_token || userToken);
+          const subRes = await fetch(subUrl.toString(), { method: "POST" });
+          const subData = await subRes.json();
+          console.log("[Facebook OAuth Page] Subscribed apps registration response:", subData);
+        } catch (subErr) {
+          console.error("[Facebook OAuth Page Only] Subscribed apps registration failed:", subErr);
+        }
+
+        return {
+          accessToken: page.access_token || userToken,
+          expiresIn: expiresIn || 5184000,
+          providerAccountId: String(page.id),
+          accountName: String(page.name),
+          profilePicUrl: page.picture?.data?.url,
+        };
       }
-    } catch (err: any) {
-      console.error("[Facebook OAuth] Pages processing failed:", err.message || err);
+    } else {
+      throw new Error("İzin verilen bir Facebook Sayfası bulunamadı. Lütfen Facebook giriş pencerinde erişim izni verdiğiniz sayfaları kontrol edin.");
     }
+  }
 
     // 2. If it's Instagram direct login (Instagram Login for Business), query /me/instagram_business_accounts
     if (isInstagram) {
