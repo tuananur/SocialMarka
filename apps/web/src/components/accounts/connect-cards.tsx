@@ -162,7 +162,8 @@ export function ConnectPlatformCards({
     <div className="space-y-4">
       {error && ERROR_MSG[error] ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {ERROR_MSG[error]}{" "}
+          {ERROR_MSG[error]}
+          {search.get("msg") ? ` (${search.get("msg")})` : ""}
           {(error === "oauth_config" || error === "missing_creds") && (
             <Link href="/accounts/setup" className="font-semibold underline">
               Kurulum

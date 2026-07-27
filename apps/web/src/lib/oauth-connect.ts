@@ -248,7 +248,8 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
       expiresIn = tokens.expiresIn;
     } catch (err: any) {
       console.error("[OAuth Connect Callback Error]", err?.message || err);
-      return NextResponse.redirect(new URL("/accounts/create?error=exchange", origin));
+      const msg = encodeURIComponent(err?.message || "exchange_failed");
+      return NextResponse.redirect(new URL(`/accounts/create?error=exchange&msg=${msg}`, origin));
     }
   } else {
     const slug = accountNameParam
