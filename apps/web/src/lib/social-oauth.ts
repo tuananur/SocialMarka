@@ -285,6 +285,25 @@ async function exchangeFacebook(
         if (page) {
           const ig = page.instagram_business_account;
           if (ig?.id) {
+            // Subscribe the Instagram business account
+            try {
+              const subUrl = new URL(`https://graph.facebook.com/v19.0/${ig.id}/subscribed_apps`);
+              subUrl.searchParams.set("subscribed_fields", "comments,messages");
+              subUrl.searchParams.set("access_token", page.access_token || userToken);
+              await fetch(subUrl.toString(), { method: "POST" });
+            } catch (subErr) {
+              console.error("[Facebook OAuth IG] Subscribed apps registration failed:", subErr);
+            }
+            // Subscribe the Facebook page as well (so we get both!)
+            try {
+              const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+              subUrl.searchParams.set("subscribed_fields", "feed,messages");
+              subUrl.searchParams.set("access_token", page.access_token || userToken);
+              await fetch(subUrl.toString(), { method: "POST" });
+            } catch (subErr) {
+              console.error("[Facebook OAuth Page] Subscribed apps registration failed:", subErr);
+            }
+
             return {
               accessToken: page.access_token || userToken,
               expiresIn: expiresIn || 5184000,
@@ -309,6 +328,16 @@ async function exchangeFacebook(
           const igData = await igRes.json();
           const ig = igData.data?.[0];
           if (ig?.id) {
+            // Subscribe the Instagram business account
+            try {
+              const subUrl = new URL(`https://graph.facebook.com/v19.0/${ig.id}/subscribed_apps`);
+              subUrl.searchParams.set("subscribed_fields", "comments,messages");
+              subUrl.searchParams.set("access_token", userToken);
+              await fetch(subUrl.toString(), { method: "POST" });
+            } catch (subErr) {
+              console.error("[Instagram Direct OAuth] Subscribed apps registration failed:", subErr);
+            }
+
             return {
               accessToken: userToken,
               expiresIn: expiresIn || 5184000,
@@ -332,6 +361,16 @@ async function exchangeFacebook(
         const pages = await pagesRes.json();
         const page = pages.data?.[0];
         if (page) {
+          // Subscribe the Facebook page
+          try {
+            const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+            subUrl.searchParams.set("subscribed_fields", "feed,messages");
+            subUrl.searchParams.set("access_token", page.access_token || userToken);
+            await fetch(subUrl.toString(), { method: "POST" });
+          } catch (subErr) {
+            console.error("[Facebook OAuth Page Only] Subscribed apps registration failed:", subErr);
+          }
+
           return {
             accessToken: page.access_token || userToken,
             expiresIn: expiresIn || 5184000,
