@@ -450,7 +450,7 @@ async function exchangeFacebook(
         };
       }
     } else {
-      throw new Error("İzin verilen bir Facebook Sayfası bulunamadı. Lütfen Facebook giriş pencerinde erişim izni verdiğiniz sayfaları kontrol edin.");
+      console.warn("[Facebook OAuth] No pages returned from Graph API, falling back to Facebook profile:", me.name);
     }
   }
 

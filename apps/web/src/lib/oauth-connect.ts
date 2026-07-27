@@ -246,7 +246,8 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
       accessToken = tokens.accessToken;
       refreshToken = tokens.refreshToken;
       expiresIn = tokens.expiresIn;
-    } catch {
+    } catch (err: any) {
+      console.error("[OAuth Connect Callback Error]", err?.message || err);
       return NextResponse.redirect(new URL("/accounts/create?error=exchange", origin));
     }
   } else {
