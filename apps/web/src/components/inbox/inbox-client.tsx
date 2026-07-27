@@ -174,35 +174,66 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
     );
   }
 
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/inbox/sync", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.conversations) {
+        setConversations(data.conversations);
+        if (!activeId && data.conversations[0]?.id) {
+          setActiveId(data.conversations[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("[InboxClient] Sync failed:", err);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="min-w-0 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="font-display text-2xl font-medium tracking-tight text-ink-900">
           Gelen Kutusu & Aktivite
         </h1>
-        <div className="flex items-center gap-1 rounded-xl bg-ink-100 p-1 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setMainTab("messages")}
-            className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
-              mainTab === "messages"
-                ? "bg-white text-ink-900 shadow-sm"
-                : "text-ink-500 hover:text-ink-800"
-            }`}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            size="sm"
+            variant="outline"
+            isDisabled={syncing}
+            onClick={handleSync}
+            className="bg-white border border-ink-200 text-ink-700 text-xs font-medium"
           >
-            Mesajlar & Yorumlar
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab("activities")}
-            className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
-              mainTab === "activities"
-                ? "bg-white text-ink-900 shadow-sm"
-                : "text-ink-500 hover:text-ink-800"
-            }`}
-          >
-            Aktivite Akışı (Beğeni & Takip)
-          </button>
+            {syncing ? "Senkronize ediliyor..." : "↻ Yenile & Senkronize Et"}
+          </Button>
+          <div className="flex items-center gap-1 rounded-xl bg-ink-100 p-1">
+            <button
+              type="button"
+              onClick={() => setMainTab("messages")}
+              className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+                mainTab === "messages"
+                  ? "bg-white text-ink-900 shadow-sm"
+                  : "text-ink-500 hover:text-ink-800"
+              }`}
+            >
+              Mesajlar & Yorumlar
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainTab("activities")}
+              className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+                mainTab === "activities"
+                  ? "bg-white text-ink-900 shadow-sm"
+                  : "text-ink-500 hover:text-ink-800"
+              }`}
+            >
+              Aktivite Akışı (Beğeni & Takip)
+            </button>
+          </div>
         </div>
       </div>
 
