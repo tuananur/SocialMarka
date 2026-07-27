@@ -219,13 +219,33 @@ async function fetchAllPages(userToken: string): Promise<any[]> {
     }
   };
 
-  // 1. Query /me/accounts
+  // 1. Basic /me/accounts query (guaranteed to succeed without field/permission restrictions)
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/me/accounts?limit=100&access_token=${encodeURIComponent(userToken)}`
+    );
+    const json = await res.json();
+    console.log("[Facebook OAuth] Basic /me/accounts response:", {
+      ok: res.ok,
+      status: res.status,
+      error: json.error || null,
+      dataLength: json.data?.length || 0,
+      pageNames: json.data?.map((p: any) => p.name) || [],
+    });
+    if (res.ok && json.data) {
+      addPages(json.data);
+    }
+  } catch (err: any) {
+    console.error("[Facebook OAuth] Fetch basic /me/accounts error:", err.message || err);
+  }
+
+  // 2. Query /me/accounts with fields
   try {
     const res = await fetch(
       `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&limit=100&access_token=${encodeURIComponent(userToken)}`
     );
     const json = await res.json();
-    console.log("[Facebook OAuth] /me/accounts response details:", {
+    console.log("[Facebook OAuth] /me/accounts with fields response details:", {
       ok: res.ok,
       status: res.status,
       error: json.error || null,
@@ -436,6 +456,21 @@ async function exchangeFacebook(
         id: page.id,
         name: page.name,
       });
+
+      // Fetch complete details for the selected page if needed
+      if (page.id && (!page.access_token || !page.picture)) {
+        try {
+          const detailRes = await fetch(
+            `https://graph.facebook.com/v19.0/${page.id}?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
+          );
+          if (detailRes.ok) {
+            const detailJson = await detailRes.json();
+            page = { ...page, ...detailJson };
+          }
+        } catch (detailErr: any) {
+          console.error("[Facebook OAuth] Single page detail fetch error:", detailErr.message || detailErr);
+        }
+      }
 
       const ig = page.instagram_business_account;
       if (isInstagram && ig?.id) {
