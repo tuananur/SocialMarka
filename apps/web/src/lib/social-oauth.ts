@@ -150,9 +150,9 @@ export async function exchangeOAuthCode(opts: {
     case "LINKEDIN":
       return exchangeLinkedIn(code, redirectUri);
     case "FACEBOOK":
-      return exchangeFacebook(code, redirectUri, connectType === "page");
+      return exchangeFacebook(code, redirectUri, connectType === "page", false);
     case "INSTAGRAM":
-      return exchangeFacebook(code, redirectUri, true);
+      return exchangeFacebook(code, redirectUri, true, true);
     case "YOUTUBE":
       return exchangeYouTube(code, redirectUri);
     case "X":
@@ -207,9 +207,11 @@ async function exchangeLinkedIn(code: string, redirectUri: string): Promise<Exch
 async function exchangeFacebook(
   code: string,
   redirectUri: string,
-  preferPage: boolean
+  preferPage: boolean,
+  isInstagram: boolean = false
 ): Promise<ExchangedTokens> {
-  const creds = getPlatformCreds("FACEBOOK");
+  const provider = isInstagram ? "INSTAGRAM" : "FACEBOOK";
+  const creds = getPlatformCreds(provider) || getPlatformCreds("FACEBOOK");
   if (!creds) throw new Error("Facebook API anahtarları eksik");
   const tokenUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
   tokenUrl.searchParams.set("client_id", creds.clientId);

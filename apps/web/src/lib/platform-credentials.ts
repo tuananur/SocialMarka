@@ -55,10 +55,14 @@ function writeStore(data: Store) {
 function envCreds(provider: PlatformType): PlatformCreds | null {
   switch (provider) {
     case "FACEBOOK":
-    case "INSTAGRAM":
       return {
         clientId: normalizeCredValue(process.env.FACEBOOK_APP_ID),
         clientSecret: normalizeCredValue(process.env.FACEBOOK_APP_SECRET),
+      };
+    case "INSTAGRAM":
+      return {
+        clientId: normalizeCredValue(process.env.INSTAGRAM_APP_ID || process.env.FACEBOOK_APP_ID),
+        clientSecret: normalizeCredValue(process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET),
       };
     case "LINKEDIN":
       return {
