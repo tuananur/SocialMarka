@@ -194,6 +194,27 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
     }
   }
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDeleteConversation(id: string) {
+    if (!confirm("Bu konuşmayı gelen kutusundan silmek istediğinize emin misiniz?")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/inbox/conversations/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        const remaining = conversations.filter((c) => c.id !== id);
+        setConversations(remaining);
+        if (activeId === id) {
+          setActiveId(remaining[0]?.id || null);
+        }
+      }
+    } catch (err) {
+      console.error("[InboxClient] Delete conversation error:", err);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div className="min-w-0 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -330,11 +351,22 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
                         <span>{active.socialAccount.accountName}</span>
                       </div>
                     </div>
-                    <Chip size="sm" variant="soft" className="ml-auto bg-amber-400/20 text-amber-900 font-semibold border-none">
-                      <Chip.Label>
-                        {active.type === "COMMENT" ? "Yorum Yanıtı" : "Direkt Mesaj"}
-                      </Chip.Label>
-                    </Chip>
+                    <div className="ml-auto flex items-center gap-2">
+                      <Chip size="sm" variant="soft" className="bg-amber-400/20 text-amber-900 font-semibold border-none">
+                        <Chip.Label>
+                          {active.type === "COMMENT" ? "Yorum Yanıtı" : "Direkt Mesaj"}
+                        </Chip.Label>
+                      </Chip>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        isDisabled={deletingId === active.id}
+                        onClick={() => handleDeleteConversation(active.id)}
+                        className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-medium"
+                      >
+                        {deletingId === active.id ? "Siliniyor..." : "Sil"}
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex-1 space-y-4 overflow-y-auto p-4 bg-[#fafbfc]/35">
                     {active.messages.map((m) => (

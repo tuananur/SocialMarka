@@ -32,9 +32,19 @@ export async function DELETE(_req: Request, { params }: Params) {
     }
   }
 
-  // Yayınlanmış tüm platform gönderilerini ilgili sosyal ağ API'lerinden sil
+  // Yayınlanmış tüm platform gönderilerini ilgili sosyal ağ API'lerinden ve gelen kutusundan sil
   const deletionResults: Array<{ platform: string; remotePostId: string; success: boolean; error?: string }> = [];
   for (const target of post.targets) {
+    if (target.remotePostId) {
+      try {
+        await prisma.inboxConversation.deleteMany({
+          where: { workspaceId: ctx.workspaceId, remoteId: target.remotePostId },
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
     if (target.status === "PUBLISHED" && target.remotePostId && target.socialAccount) {
       try {
         const accessToken = resolveAccessToken(target.socialAccount.encryptedAccessToken);
