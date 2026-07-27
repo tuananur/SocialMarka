@@ -153,7 +153,7 @@ export async function exchangeOAuthCode(opts: {
     case "FACEBOOK":
       return exchangeFacebook(code, redirectUri, connectType === "page", false);
     case "INSTAGRAM":
-      return exchangeFacebook(code, redirectUri, true, true);
+      return exchangeInstagram(code, redirectUri);
     case "YOUTUBE":
       return exchangeYouTube(code, redirectUri);
     case "X":
@@ -352,6 +352,71 @@ async function exchangeFacebook(
     providerAccountId: String(me.id),
     accountName: String(me.name || "Facebook"),
     profilePicUrl: me.picture?.data?.url,
+  };
+}
+
+async function exchangeInstagram(
+  code: string,
+  redirectUri: string
+): Promise<ExchangedTokens> {
+  const creds = getPlatformCreds("INSTAGRAM");
+  if (!creds) throw new Error("Instagram API anahtarları eksik");
+
+  const tokenUrl = "https://api.instagram.com/oauth/access_token";
+  const body = new URLSearchParams({
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+    code,
+  });
+
+  const tokenRes = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+
+  const token = await tokenRes.json();
+  if (!tokenRes.ok || !token.access_token) {
+    throw new Error(token.error_message || token.error?.message || "Instagram token alınamadı");
+  }
+
+  let userToken = String(token.access_token);
+  let expiresIn = 5184000; // 60 days fallback
+
+  try {
+    const llUrl = new URL("https://graph.instagram.com/access_token");
+    llUrl.searchParams.set("grant_type", "ig_exchange_token");
+    llUrl.searchParams.set("client_secret", creds.clientSecret);
+    llUrl.searchParams.set("access_token", userToken);
+
+    const llRes = await fetch(llUrl);
+    const ll = await llRes.json();
+    if (llRes.ok && ll.access_token) {
+      userToken = String(ll.access_token);
+      expiresIn = Number(ll.expires_in || 5184000);
+    }
+  } catch {
+    // Continue with short-lived token
+  }
+
+  const meRes = await fetch(
+    `https://graph.instagram.com/me?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(userToken)}`
+  );
+  const me = await meRes.json();
+  if (!meRes.ok) {
+    throw new Error(me.error_message || me.error?.message || "Instagram profil okunamadı");
+  }
+
+  return {
+    accessToken: userToken,
+    expiresIn,
+    providerAccountId: String(me.id || token.user_id),
+    accountName: String(me.username || me.name || "Instagram Account"),
+    profilePicUrl: me.profile_picture_url,
   };
 }
 
