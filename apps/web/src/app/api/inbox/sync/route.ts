@@ -10,6 +10,18 @@ export async function POST(_req: Request) {
     return NextResponse.json({ error: "Yetkiniz yok" }, { status: 403 });
   }
 
+  // Demo verileri temizle
+  try {
+    await prisma.inboxConversation.deleteMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+        senderName: { in: ["Melis Yılmaz", "Ahmet Kaya", "Selin Çelik", "Caner Öztürk"] },
+      },
+    });
+  } catch {
+    /* ignore */
+  }
+
   const accounts = await prisma.socialAccount.findMany({
     where: {
       workspaceId: ctx.workspaceId,
@@ -84,123 +96,44 @@ export async function POST(_req: Request) {
           console.error(`[Inbox Sync DM] Error syncing ${account.id}:`, dmErr?.message || dmErr);
         }
 
-        // Fetch Live Instagram Comments
-        if (account.provider === "INSTAGRAM") {
+        // Fetch Live Instagram Comments via multiple endpoints (including page-linked IG business account)
+        if (account.provider === "INSTAGRAM" || account.provider === "FACEBOOK") {
           try {
             const mediaCandidates = [
+              `https://graph.facebook.com/v19.0/${account.providerAccountId}?fields=instagram_business_account{id,username,media{id,caption,comments{id,text,username,timestamp}}}&access_token=${encodeURIComponent(token)}`,
               `https://graph.facebook.com/v19.0/${account.providerAccountId}/media?fields=id,caption,comments{id,text,username,timestamp,from}&access_token=${encodeURIComponent(token)}`,
               `https://graph.instagram.com/me/media?fields=id,caption,comments{id,text,username,timestamp}&access_token=${encodeURIComponent(token)}`,
-              `https://graph.instagram.com/v19.0/me/media?fields=id,caption,comments{id,text,username,timestamp}&access_token=${encodeURIComponent(token)}`,
-              `https://graph.facebook.com/v19.0/me/media?fields=id,caption,comments{id,text,username,timestamp,from}&access_token=${encodeURIComponent(token)}`,
             ];
 
-            let mediaList: any[] = [];
             for (const mediaUrl of mediaCandidates) {
               try {
                 const res = await fetch(mediaUrl);
                 const json = await res.json();
-                if (res.ok && Array.isArray(json.data) && json.data.length > 0) {
-                  mediaList = json.data;
-                  break;
+
+                let mediaItems: any[] = [];
+                if (json.instagram_business_account?.media?.data) {
+                  mediaItems = json.instagram_business_account.media.data;
+                } else if (Array.isArray(json.data)) {
+                  mediaItems = json.data;
                 }
-              } catch {
-                /* try next candidate */
-              }
-            }
 
-            for (const mediaItem of mediaList) {
-              let comments: any[] = Array.isArray(mediaItem.comments?.data) ? mediaItem.comments.data : [];
+                if (mediaItems.length > 0) {
+                  for (const mediaItem of mediaItems) {
+                    let comments: any[] = Array.isArray(mediaItem.comments?.data) ? mediaItem.comments.data : [];
 
-              if (comments.length === 0 && mediaItem.id) {
-                const commentUrls = [
-                  `https://graph.facebook.com/v19.0/${mediaItem.id}/comments?fields=id,text,username,timestamp,from&access_token=${encodeURIComponent(token)}`,
-                  `https://graph.instagram.com/${mediaItem.id}/comments?fields=id,text,username,timestamp&access_token=${encodeURIComponent(token)}`,
-                ];
-                for (const cUrl of commentUrls) {
-                  try {
-                    const cRes = await fetch(cUrl);
-                    const cJson = await cRes.json();
-                    if (cRes.ok && Array.isArray(cJson.data) && cJson.data.length > 0) {
-                      comments = cJson.data;
-                      break;
+                    if (comments.length === 0 && mediaItem.id) {
+                      const cRes = await fetch(
+                        `https://graph.facebook.com/v19.0/${mediaItem.id}/comments?fields=id,text,username,timestamp,from&access_token=${encodeURIComponent(token)}`
+                      );
+                      if (cRes.ok) {
+                        const cJson = await cRes.json();
+                        if (Array.isArray(cJson.data)) comments = cJson.data;
+                      }
                     }
-                  } catch {
-                    /* try next */
-                  }
-                }
-              }
 
-              for (const comment of comments) {
-                const sender = comment.username || comment.from?.username || comment.from?.name || "instagram_user";
-                const commentText = comment.text || comment.message || "";
-                if (!commentText) continue;
-
-                let conversation = await prisma.inboxConversation.findFirst({
-                  where: {
-                    socialAccountId: account.id,
-                    senderName: sender,
-                    type: InboxType.COMMENT,
-                  },
-                });
-
-                if (!conversation) {
-                  conversation = await prisma.inboxConversation.create({
-                    data: {
-                      workspaceId: ctx.workspaceId,
-                      socialAccountId: account.id,
-                      senderName: sender,
-                      lastMessage: commentText,
-                      lastMessageAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
-                      type: InboxType.COMMENT,
-                      remoteId: comment.id,
-                    },
-                  });
-                } else {
-                  await prisma.inboxConversation.update({
-                    where: { id: conversation.id },
-                    data: {
-                      lastMessage: commentText,
-                      lastMessageAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
-                      isRead: false,
-                    },
-                  });
-                }
-
-                const existingMsg = await prisma.inboxMessage.findFirst({
-                  where: { conversationId: conversation.id, messageText: commentText },
-                });
-                if (!existingMsg) {
-                  await prisma.inboxMessage.create({
-                    data: {
-                      conversationId: conversation.id,
-                      senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
-                      messageText: commentText,
-                      createdAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
-                    },
-                  });
-                }
-              }
-            }
-          } catch (igCommentErr: any) {
-            console.error(`[Inbox Sync IG Comments] Error syncing ${account.id}:`, igCommentErr?.message || igCommentErr);
-          }
-        }
-
-        // Fetch Live Facebook Feed Comments
-        if (account.provider === "FACEBOOK") {
-          try {
-            const feedRes = await fetch(
-              `https://graph.facebook.com/v19.0/${account.providerAccountId}/feed?fields=id,message,comments{id,message,from,created_time}&access_token=${encodeURIComponent(token)}`
-            );
-            if (feedRes.ok) {
-              const feedJson = await feedRes.json();
-              if (Array.isArray(feedJson.data)) {
-                for (const feedItem of feedJson.data) {
-                  const comments = feedItem.comments?.data;
-                  if (Array.isArray(comments)) {
                     for (const comment of comments) {
-                      const sender = comment.from?.name || "facebook_user";
-                      const commentText = comment.message || "";
+                      const sender = comment.username || comment.from?.username || comment.from?.name || "instagram_user";
+                      const commentText = comment.text || comment.message || "";
                       if (!commentText) continue;
 
                       let conversation = await prisma.inboxConversation.findFirst({
@@ -218,7 +151,7 @@ export async function POST(_req: Request) {
                             socialAccountId: account.id,
                             senderName: sender,
                             lastMessage: commentText,
-                            lastMessageAt: comment.created_time ? new Date(comment.created_time) : new Date(),
+                            lastMessageAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
                             type: InboxType.COMMENT,
                             remoteId: comment.id,
                           },
@@ -228,7 +161,7 @@ export async function POST(_req: Request) {
                           where: { id: conversation.id },
                           data: {
                             lastMessage: commentText,
-                            lastMessageAt: comment.created_time ? new Date(comment.created_time) : new Date(),
+                            lastMessageAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
                             isRead: false,
                           },
                         });
@@ -241,19 +174,22 @@ export async function POST(_req: Request) {
                         await prisma.inboxMessage.create({
                           data: {
                             conversationId: conversation.id,
-                            senderType: SenderType.USER,
+                            senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
                             messageText: commentText,
-                            createdAt: comment.created_time ? new Date(comment.created_time) : new Date(),
+                            createdAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
                           },
                         });
                       }
                     }
                   }
+                  break;
                 }
+              } catch {
+                /* try next candidate */
               }
             }
-          } catch (fbCommentErr: any) {
-            console.error(`[Inbox Sync FB Comments] Error syncing ${account.id}:`, fbCommentErr?.message || fbCommentErr);
+          } catch (igCommentErr: any) {
+            console.error(`[Inbox Sync IG Comments] Error syncing ${account.id}:`, igCommentErr?.message || igCommentErr);
           }
         }
 
