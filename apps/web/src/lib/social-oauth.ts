@@ -443,6 +443,25 @@ async function exchangeInstagram(
     throw new Error(me.error_message || me.error?.message || "Instagram profil okunamadı");
   }
 
+  // 4. Register the Webhook subscription (subscribed_apps) on Meta for this Instagram account
+  try {
+    const igId = me.id || token.user_id;
+    console.log("[Instagram OAuth] Registering subscribed_apps on Meta...", { igId });
+    const subUrl = `https://graph.facebook.com/v19.0/${igId}/subscribed_apps`;
+    const subRes = await fetch(subUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscribed_fields: ["comments", "messages"],
+        access_token: userToken,
+      }),
+    });
+    const subData = await subRes.json();
+    console.log("[Instagram OAuth] Subscribed apps registration response:", subData);
+  } catch (subErr: any) {
+    console.error("[Instagram OAuth] Subscribed apps registration failed:", subErr?.message || subErr);
+  }
+
   return {
     accessToken: userToken,
     expiresIn,
