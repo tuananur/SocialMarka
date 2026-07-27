@@ -447,14 +447,12 @@ async function exchangeInstagram(
   try {
     const igId = me.id || token.user_id;
     console.log("[Instagram OAuth] Registering subscribed_apps on Meta...", { igId });
-    const subUrl = `https://graph.facebook.com/v19.0/${igId}/subscribed_apps`;
-    const subRes = await fetch(subUrl, {
+    const subUrl = new URL(`https://graph.facebook.com/v19.0/${igId}/subscribed_apps`);
+    subUrl.searchParams.set("subscribed_fields", "comments,messages");
+    subUrl.searchParams.set("access_token", userToken);
+    
+    const subRes = await fetch(subUrl.toString(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subscribed_fields: ["comments", "messages"],
-        access_token: userToken,
-      }),
     });
     const subData = await subRes.json();
     console.log("[Instagram OAuth] Subscribed apps registration response:", subData);
