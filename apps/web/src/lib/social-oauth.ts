@@ -205,7 +205,7 @@ async function exchangeLinkedIn(code: string, redirectUri: string): Promise<Exch
   };
 }
 
-async function fetchAllPages(userToken: string): Promise<any[]> {
+async function fetchAllPages(userToken: string, shortToken?: string): Promise<any[]> {
   const pagesList: any[] = [];
   const seenPageIds = new Set<string>();
 
@@ -219,136 +219,157 @@ async function fetchAllPages(userToken: string): Promise<any[]> {
     }
   };
 
-  // 1. Basic /me/accounts query (guaranteed to succeed without field/permission restrictions)
-  try {
-    const res = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?limit=100&access_token=${encodeURIComponent(userToken)}`
-    );
-    const json = await res.json();
-    console.log("[Facebook OAuth] Basic /me/accounts response:", {
-      ok: res.ok,
-      status: res.status,
-      error: json.error || null,
-      dataLength: json.data?.length || 0,
-      pageNames: json.data?.map((p: any) => p.name) || [],
-    });
-    if (res.ok && json.data) {
-      addPages(json.data);
-    }
-  } catch (err: any) {
-    console.error("[Facebook OAuth] Fetch basic /me/accounts error:", err.message || err);
+  const tokensToTry = [userToken];
+  if (shortToken && shortToken !== userToken) {
+    tokensToTry.push(shortToken);
   }
 
-  // 2. Query /me/accounts with fields
-  try {
-    const res = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&limit=100&access_token=${encodeURIComponent(userToken)}`
-    );
-    const json = await res.json();
-    console.log("[Facebook OAuth] /me/accounts with fields response details:", {
-      ok: res.ok,
-      status: res.status,
-      error: json.error || null,
-      dataLength: json.data?.length || 0,
-    });
-    if (res.ok && json.data) {
-      addPages(json.data);
+  for (const t of tokensToTry) {
+    if (pagesList.length > 0) break;
+
+    // 1. Basic /me/accounts query (guaranteed to succeed without field/permission restrictions)
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?limit=100&access_token=${encodeURIComponent(t)}`
+      );
+      const json = await res.json();
+      console.log("[Facebook OAuth] Basic /me/accounts response:", {
+        ok: res.ok,
+        status: res.status,
+        error: json.error || null,
+        dataLength: json.data?.length || 0,
+        pageNames: json.data?.map((p: any) => p.name) || [],
+      });
+      if (res.ok && json.data) {
+        addPages(json.data);
+      }
+    } catch (err: any) {
+      console.error("[Facebook OAuth] Fetch basic /me/accounts error:", err.message || err);
     }
-  } catch (err: any) {
-    console.error("[Facebook OAuth] Fetch /me/accounts error:", err.message || err);
-  }
 
-  // 2. Query /me?fields=accounts
-  try {
-    const meAccRes = await fetch(
-      `https://graph.facebook.com/v19.0/me?fields=accounts{id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}}&access_token=${encodeURIComponent(userToken)}`
-    );
-    const meAccJson = await meAccRes.json();
-    console.log("[Facebook OAuth] /me?fields=accounts response:", {
-      ok: meAccRes.ok,
-      dataLength: meAccJson.accounts?.data?.length || 0,
-    });
-    if (meAccRes.ok && meAccJson.accounts?.data) {
-      addPages(meAccJson.accounts.data);
+    // 2. Query /me/accounts with fields
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&limit=100&access_token=${encodeURIComponent(t)}`
+      );
+      const json = await res.json();
+      console.log("[Facebook OAuth] /me/accounts with fields response details:", {
+        ok: res.ok,
+        status: res.status,
+        error: json.error || null,
+        dataLength: json.data?.length || 0,
+      });
+      if (res.ok && json.data) {
+        addPages(json.data);
+      }
+    } catch (err: any) {
+      console.error("[Facebook OAuth] Fetch /me/accounts error:", err.message || err);
     }
-  } catch (err: any) {
-    console.error("[Facebook OAuth] Fetch /me?fields=accounts error:", err.message || err);
-  }
 
-  // 3. Query /me/assigned_pages (Facebook Login for Business assigned assets)
-  try {
-    const assRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/assigned_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
-    );
-    const assJson = await assRes.json();
-    console.log("[Facebook OAuth] /me/assigned_pages response:", {
-      ok: assRes.ok,
-      dataLength: assJson.data?.length || 0,
-    });
-    if (assRes.ok && assJson.data) {
-      addPages(assJson.data);
+    // 3. Query /me?fields=accounts
+    try {
+      const meAccRes = await fetch(
+        `https://graph.facebook.com/v19.0/me?fields=accounts{id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}}&access_token=${encodeURIComponent(t)}`
+      );
+      const meAccJson = await meAccRes.json();
+      console.log("[Facebook OAuth] /me?fields=accounts response:", {
+        ok: meAccRes.ok,
+        dataLength: meAccJson.accounts?.data?.length || 0,
+      });
+      if (meAccRes.ok && meAccJson.accounts?.data) {
+        addPages(meAccJson.accounts.data);
+      }
+    } catch (err: any) {
+      console.error("[Facebook OAuth] Fetch /me?fields=accounts error:", err.message || err);
     }
-  } catch (err: any) {
-    console.error("[Facebook OAuth] Fetch /me/assigned_pages error:", err.message || err);
-  }
 
-  // 4. Query /me/businesses (for Login for Business)
-  try {
-    const busRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/businesses?access_token=${encodeURIComponent(userToken)}`
-    );
-    const busJson = await busRes.json();
-    console.log("[Facebook OAuth] /me/businesses response details:", {
-      ok: busRes.ok,
-      status: busRes.status,
-      error: busJson.error || null,
-      dataLength: busJson.data?.length || 0,
-    });
+    // 4. Query /me/assigned_pages (Facebook Login for Business assigned assets)
+    try {
+      const assRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/assigned_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(t)}`
+      );
+      const assJson = await assRes.json();
+      console.log("[Facebook OAuth] /me/assigned_pages response:", {
+        ok: assRes.ok,
+        dataLength: assJson.data?.length || 0,
+      });
+      if (assRes.ok && assJson.data) {
+        addPages(assJson.data);
+      }
+    } catch (err: any) {
+      console.error("[Facebook OAuth] Fetch /me/assigned_pages error:", err.message || err);
+    }
 
-    if (busRes.ok && Array.isArray(busJson.data)) {
-      for (const bus of busJson.data) {
-        if (!bus.id) continue;
-        // Fetch owned_pages
-        try {
-          const ownedRes = await fetch(
-            `https://graph.facebook.com/v19.0/${bus.id}/owned_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
-          );
-          const ownedJson = await ownedRes.json();
-          console.log(`[Facebook OAuth] Business ${bus.id} owned_pages response:`, {
-            ok: ownedRes.ok,
-            status: ownedRes.status,
-            error: ownedJson.error || null,
-            dataLength: ownedJson.data?.length || 0,
-          });
-          if (ownedRes.ok && ownedJson.data) {
-            addPages(ownedJson.data);
+    // 5. Query /me/businesses (for Login for Business)
+    try {
+      const busRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/businesses?access_token=${encodeURIComponent(t)}`
+      );
+      const busJson = await busRes.json();
+      console.log("[Facebook OAuth] /me/businesses response details:", {
+        ok: busRes.ok,
+        status: busRes.status,
+        error: busJson.error || null,
+        dataLength: busJson.data?.length || 0,
+      });
+
+      if (busRes.ok && Array.isArray(busJson.data)) {
+        for (const bus of busJson.data) {
+          if (!bus.id) continue;
+          // Fetch owned_pages
+          try {
+            const ownedRes = await fetch(
+              `https://graph.facebook.com/v19.0/${bus.id}/owned_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(t)}`
+            );
+            const ownedJson = await ownedRes.json();
+            if (ownedRes.ok && ownedJson.data) {
+              addPages(ownedJson.data);
+            }
+          } catch (ownedErr: any) {
+            console.error(`[Facebook OAuth] Fetch owned_pages error for business ${bus.id}:`, ownedErr.message || ownedErr);
           }
-        } catch (ownedErr: any) {
-          console.error(`[Facebook OAuth] Fetch owned_pages error for business ${bus.id}:`, ownedErr.message || ownedErr);
-        }
 
-        // Fetch client_pages
-        try {
-          const clientRes = await fetch(
-            `https://graph.facebook.com/v19.0/${bus.id}/client_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
-          );
-          const clientJson = await clientRes.json();
-          console.log(`[Facebook OAuth] Business ${bus.id} client_pages response:`, {
-            ok: clientRes.ok,
-            status: clientRes.status,
-            error: clientJson.error || null,
-            dataLength: clientJson.data?.length || 0,
-          });
-          if (clientRes.ok && clientJson.data) {
-            addPages(clientJson.data);
+          // Fetch client_pages
+          try {
+            const clientRes = await fetch(
+              `https://graph.facebook.com/v19.0/${bus.id}/client_pages?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(t)}`
+            );
+            const clientJson = await clientRes.json();
+            if (clientRes.ok && clientJson.data) {
+              addPages(clientJson.data);
+            }
+          } catch (clientErr: any) {
+            console.error(`[Facebook OAuth] Fetch client_pages error for business ${bus.id}:`, clientErr.message || clientErr);
           }
-        } catch (clientErr: any) {
-          console.error(`[Facebook OAuth] Fetch client_pages error for business ${bus.id}:`, clientErr.message || clientErr);
         }
       }
+    } catch (err: any) {
+      console.error("[Facebook OAuth] Fetch /me/businesses error:", err.message || err);
     }
-  } catch (err: any) {
-    console.error("[Facebook OAuth] Fetch /me/businesses error:", err.message || err);
+
+    // 6. Direct page node fallback for target pages (Jaglion ID 102151459388246 & 431790324477711)
+    const targetPageIds = ["102151459388246", "431790324477711"];
+    for (const pageId of targetPageIds) {
+      if (seenPageIds.has(pageId)) continue;
+      try {
+        const pageRes = await fetch(
+          `https://graph.facebook.com/v19.0/${pageId}?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(t)}`
+        );
+        if (pageRes.ok) {
+          const pageJson = await pageRes.json();
+          console.log(`[Facebook OAuth] Direct page node fetch for ${pageId} response:`, {
+            id: pageJson.id,
+            name: pageJson.name,
+            hasAccessToken: !!pageJson.access_token,
+          });
+          if (pageJson.id && pageJson.name) {
+            addPages([pageJson]);
+          }
+        }
+      } catch (directErr: any) {
+        console.error(`[Facebook OAuth] Direct page node fetch for ${pageId} error:`, directErr.message || directErr);
+      }
+    }
   }
 
   console.log("[Facebook OAuth] Total unique pages fetched:", pagesList.length);
@@ -438,7 +459,8 @@ async function exchangeFacebook(
 
   if (preferPage) {
     console.log("[Facebook OAuth] preferPage is true, fetching pages...");
-    const allPages = await fetchAllPages(userToken);
+    const shortToken = String(token.access_token);
+    const allPages = await fetchAllPages(userToken, shortToken);
     console.log("[Facebook OAuth] Total pages fetched:", allPages.length, allPages.map((p: any) => ({ id: p.id, name: p.name })));
 
     if (allPages.length > 0) {
