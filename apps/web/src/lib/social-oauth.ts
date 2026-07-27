@@ -245,6 +245,28 @@ async function exchangeFacebook(
     /* kısa token ile devam */
   }
 
+  if (isInstagram) {
+    try {
+      const meRes = await fetch(
+        `https://graph.instagram.com/me?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(userToken)}`
+      );
+      if (meRes.ok) {
+        const me = await meRes.json();
+        if (me.id) {
+          return {
+            accessToken: userToken,
+            expiresIn: expiresIn || 5184000,
+            providerAccountId: String(me.id),
+            accountName: String(me.username || me.name),
+            profilePicUrl: me.profile_picture_url,
+          };
+        }
+      }
+    } catch {
+      // Fallback to Facebook Graph API
+    }
+  }
+
   const meRes = await fetch(
     `https://graph.facebook.com/v19.0/me?fields=id,name,picture&access_token=${encodeURIComponent(userToken)}`
   );
