@@ -43,6 +43,9 @@ export async function publishInstagram(params: {
   const format = parseIgFormat(params.content);
   const caption = stripIgMarkers(params.content).slice(0, 2200);
   const igUserId = params.providerAccountId;
+  const apiBase = params.accessToken.startsWith("IG")
+    ? "https://graph.instagram.com/v19.0"
+    : "https://graph.facebook.com/v19.0";
   let mediaUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
 
   if (!mediaUrl) {
@@ -83,7 +86,7 @@ export async function publishInstagram(params: {
   }
 
   const createRes = await fetch(
-    `https://graph.facebook.com/v19.0/${encodeURIComponent(igUserId)}/media`,
+    `${apiBase}/${encodeURIComponent(igUserId)}/media`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -105,7 +108,7 @@ export async function publishInstagram(params: {
 
   for (let i = 0; i < 30; i++) {
     const st = await fetch(
-      `https://graph.facebook.com/v19.0/${encodeURIComponent(creationId)}?fields=status_code&access_token=${encodeURIComponent(params.accessToken)}`,
+      `${apiBase}/${encodeURIComponent(creationId)}?fields=status_code&access_token=${encodeURIComponent(params.accessToken)}`,
     );
     const stData = (await st.json()) as {
       status_code?: string;
@@ -126,7 +129,7 @@ export async function publishInstagram(params: {
   pubBody.set("access_token", params.accessToken);
 
   const pubRes = await fetch(
-    `https://graph.facebook.com/v19.0/${encodeURIComponent(igUserId)}/media_publish`,
+    `${apiBase}/${encodeURIComponent(igUserId)}/media_publish`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
