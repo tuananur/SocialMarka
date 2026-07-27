@@ -174,7 +174,13 @@ export async function POST(
       });
     }
 
-    await enqueueWebhook({ webhookEventId: event.id });
+    if (process.env.INLINE_PUBLISH !== "true") {
+      try {
+        await enqueueWebhook({ webhookEventId: event.id });
+      } catch (err) {
+        console.warn("[Webhook Queueing Error - Skipping queue]:", err);
+      }
+    }
     return NextResponse.json({ ok: true, id: event.id });
   } catch {
     return NextResponse.json({ ok: true, duplicate: true });
