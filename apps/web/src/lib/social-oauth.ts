@@ -374,6 +374,16 @@ async function exchangeFacebook(
   console.log("[Facebook OAuth] User profile response:", me);
   if (!meRes.ok) throw new Error(me.error?.message || "Facebook profil okunamadı");
 
+  try {
+    const permRes = await fetch(
+      `https://graph.facebook.com/v19.0/me/permissions?access_token=${encodeURIComponent(userToken)}`
+    );
+    const perms = await permRes.json();
+    console.log("[Facebook OAuth] Token permissions list:", perms);
+  } catch (permErr: any) {
+    console.error("[Facebook OAuth] Fetching permissions failed:", permErr.message || permErr);
+  }
+
   if (preferPage) {
     console.log("[Facebook OAuth] preferPage is true, fetching pages...");
     try {
