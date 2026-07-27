@@ -252,30 +252,75 @@ async function exchangeFacebook(
   if (!meRes.ok) throw new Error(me.error?.message || "Facebook profil okunamadı");
 
   if (preferPage) {
-    const pagesRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
-    );
-    const pages = await pagesRes.json();
-    const page = pages.data?.[0];
-    if (page) {
-      // Instagram bağlama: sayfaya bağlı IG business hesabı varsa onu kullan
-      const ig = page.instagram_business_account;
-      if (ig?.id) {
-        return {
-          accessToken: page.access_token || userToken,
-          expiresIn: expiresIn || 5184000,
-          providerAccountId: String(ig.id),
-          accountName: String(ig.username || ig.name || page.name),
-          profilePicUrl: ig.profile_picture_url || page.picture?.data?.url,
-        };
+    // 1. Try traditional Facebook Page query (which contains instagram_business_account)
+    try {
+      const pagesRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
+      );
+      if (pagesRes.ok) {
+        const pages = await pagesRes.json();
+        const page = pages.data?.[0];
+        if (page) {
+          const ig = page.instagram_business_account;
+          if (ig?.id) {
+            return {
+              accessToken: page.access_token || userToken,
+              expiresIn: expiresIn || 5184000,
+              providerAccountId: String(ig.id),
+              accountName: String(ig.username || ig.name || page.name),
+              profilePicUrl: ig.profile_picture_url || page.picture?.data?.url,
+            };
+          }
+        }
       }
-      return {
-        accessToken: page.access_token || userToken,
-        expiresIn: expiresIn || 5184000,
-        providerAccountId: String(page.id),
-        accountName: String(page.name),
-        profilePicUrl: page.picture?.data?.url,
-      };
+    } catch {
+      // Fallback
+    }
+
+    // 2. If it's Instagram direct login (Instagram Login for Business), query /me/instagram_business_accounts
+    if (isInstagram) {
+      try {
+        const igRes = await fetch(
+          `https://graph.facebook.com/v19.0/me/instagram_business_accounts?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(userToken)}`
+        );
+        if (igRes.ok) {
+          const igData = await igRes.json();
+          const ig = igData.data?.[0];
+          if (ig?.id) {
+            return {
+              accessToken: userToken,
+              expiresIn: expiresIn || 5184000,
+              providerAccountId: String(ig.id),
+              accountName: String(ig.username || ig.name),
+              profilePicUrl: ig.profile_picture_url,
+            };
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    // 3. Fallback to Facebook page if traditional page query succeeded but didn't have IG account
+    try {
+      const pagesRes = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,picture&access_token=${encodeURIComponent(userToken)}`
+      );
+      if (pagesRes.ok) {
+        const pages = await pagesRes.json();
+        const page = pages.data?.[0];
+        if (page) {
+          return {
+            accessToken: page.access_token || userToken,
+            expiresIn: expiresIn || 5184000,
+            providerAccountId: String(page.id),
+            accountName: String(page.name),
+            profilePicUrl: page.picture?.data?.url,
+          };
+        }
+      }
+    } catch {
+      // Fallback
     }
   }
 
