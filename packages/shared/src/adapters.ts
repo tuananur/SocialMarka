@@ -83,6 +83,7 @@ async function publishLinkedIn(params: {
       const uploadUrl = registerData.value.uploadMechanism["com.linkedin.ads.common.S3UploadMechanism"].uploadUrl;
       mediaAssetUrn = registerData.value.asset;
 
+      // Trigger Vercel redeployment to apply env changes
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: {
