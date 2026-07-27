@@ -97,6 +97,17 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
     });
   }
 
+  // Instagram Login debug: /api/accounts/oauth/instagram?diag=1
+  if (platform === "INSTAGRAM" && url.searchParams.get("diag") === "1") {
+    const creds = getPlatformCreds("INSTAGRAM");
+    return NextResponse.json({
+      clientId: creds?.clientId || null,
+      hasSecret: !!creds?.clientSecret,
+      envInstagramId: process.env.INSTAGRAM_APP_ID || null,
+      envFacebookId: process.env.FACEBOOK_APP_ID || null,
+    });
+  }
+
   const pkce =
     platform === "X"
       ? createPkcePair()
