@@ -359,8 +359,13 @@ async function exchangeInstagram(
   code: string,
   redirectUri: string
 ): Promise<ExchangedTokens> {
+  console.log("[Instagram OAuth] Starting exchange...", { redirectUri });
   const creds = getPlatformCreds("INSTAGRAM");
-  if (!creds) throw new Error("Instagram API anahtarları eksik");
+  if (!creds) {
+    console.error("[Instagram OAuth] Credentials missing");
+    throw new Error("Instagram API anahtarları eksik");
+  }
+  console.log("[Instagram OAuth] Using App ID:", creds.clientId);
 
   // 1. Exchange code at graph.facebook.com (using Instagram App ID/Secret)
   const tokenUrl = new URL("https://graph.facebook.com/v19.0/oauth/access_token");
@@ -369,8 +374,16 @@ async function exchangeInstagram(
   tokenUrl.searchParams.set("redirect_uri", redirectUri);
   tokenUrl.searchParams.set("code", code);
 
+  console.log("[Instagram OAuth] Exchanging code...");
   const tokenRes = await fetch(tokenUrl);
   const token = await tokenRes.json();
+  console.log("[Instagram OAuth] Exchange response:", {
+    ok: tokenRes.ok,
+    status: tokenRes.status,
+    hasToken: !!token.access_token,
+    error: token.error || null,
+  });
+
   if (!tokenRes.ok || !token.access_token) {
     throw new Error(token.error?.message || "Instagram token alınamadı");
   }
@@ -385,43 +398,65 @@ async function exchangeInstagram(
     llUrl.searchParams.set("client_id", creds.clientId);
     llUrl.searchParams.set("client_secret", creds.clientSecret);
     llUrl.searchParams.set("fb_exchange_token", userToken);
+    
+    console.log("[Instagram OAuth] Exchanging for long-lived token...");
     const llRes = await fetch(llUrl);
     const ll = await llRes.json();
+    console.log("[Instagram OAuth] Long-lived response:", {
+      ok: llRes.ok,
+      status: llRes.status,
+      hasToken: !!ll.access_token,
+      error: ll.error || null,
+    });
     if (llRes.ok && ll.access_token) {
       userToken = String(ll.access_token);
       expiresIn = Number(ll.expires_in || 5184000);
     }
-  } catch {
-    // Continue with short token
+  } catch (err: any) {
+    console.error("[Instagram OAuth] Long-lived exchange error:", err?.message || err);
   }
 
   // 3. Query the Instagram Business Accounts connected to this token on graph.facebook.com
   try {
+    console.log("[Instagram OAuth] Querying instagram_business_accounts...");
     const igRes = await fetch(
       `https://graph.facebook.com/v19.0/me/instagram_business_accounts?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(userToken)}`
     );
-    if (igRes.ok) {
-      const igData = await igRes.json();
-      const ig = igData.data?.[0];
-      if (ig?.id) {
-        return {
-          accessToken: userToken,
-          expiresIn: expiresIn || 5184000,
-          providerAccountId: String(ig.id),
-          accountName: String(ig.username || ig.name),
-          profilePicUrl: ig.profile_picture_url,
-        };
-      }
+    const igData = await igRes.json();
+    console.log("[Instagram OAuth] instagram_business_accounts response:", {
+      ok: igRes.ok,
+      status: igRes.status,
+      dataCount: igData.data?.length || 0,
+      error: igData.error || null,
+    });
+    const ig = igData.data?.[0];
+    if (ig?.id) {
+      return {
+        accessToken: userToken,
+        expiresIn: expiresIn || 5184000,
+        providerAccountId: String(ig.id),
+        accountName: String(ig.username || ig.name),
+        profilePicUrl: ig.profile_picture_url,
+      };
     }
-  } catch {
-    // Fallback
+  } catch (err: any) {
+    console.error("[Instagram OAuth] instagram_business_accounts error:", err?.message || err);
   }
 
   // 4. Fallback to me endpoint on graph.facebook.com (asking ONLY for id and username)
+  console.log("[Instagram OAuth] Querying /me profile fallback...");
   const meRes = await fetch(
     `https://graph.facebook.com/v19.0/me?fields=id,username&access_token=${encodeURIComponent(userToken)}`
   );
   const me = await meRes.json();
+  console.log("[Instagram OAuth] /me profile response:", {
+    ok: meRes.ok,
+    status: meRes.status,
+    id: me.id || null,
+    username: me.username || null,
+    error: me.error || null,
+  });
+
   if (!meRes.ok) {
     throw new Error(me.error?.message || "Instagram profil okunamadı");
   }
