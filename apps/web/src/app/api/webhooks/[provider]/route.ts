@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma, PlatformType } from "@socialmarka/db";
+import { prisma, PlatformType, SenderType, AccountStatus } from "@socialmarka/db";
 import { enqueueWebhook } from "@socialmarka/queue";
 
 const PROVIDERS: Record<string, PlatformType> = {
@@ -12,6 +12,97 @@ const PROVIDERS: Record<string, PlatformType> = {
   tiktok: PlatformType.TIKTOK,
   pinterest: PlatformType.PINTEREST,
 };
+
+async function processWebhookInline(platform: PlatformType, payload: any) {
+  let senderName = String(payload.senderName || "Bilinmeyen");
+  let messageText = String(payload.message || payload.text || "");
+  let socialAccountId = String(payload.socialAccountId || "");
+  let workspaceId = String(payload.workspaceId || "");
+  let type: "COMMENT" | "DIRECT_MESSAGE" = payload.type === "COMMENT" ? "COMMENT" : "DIRECT_MESSAGE";
+  let remoteId = payload.remoteId ? String(payload.remoteId) : null;
+  let senderAvatar = payload.senderAvatar ? String(payload.senderAvatar) : null;
+
+  // 1. Parse Meta raw payload
+  if (platform === PlatformType.INSTAGRAM && payload.object === "instagram") {
+    const entry = payload.entry?.[0];
+    if (entry) {
+      const igAccountId = String(entry.id);
+      const account = await prisma.socialAccount.findFirst({
+        where: {
+          provider: PlatformType.INSTAGRAM,
+          providerAccountId: igAccountId,
+          status: { not: AccountStatus.DISCONNECTED },
+        },
+      });
+
+      if (account) {
+        socialAccountId = account.id;
+        workspaceId = account.workspaceId;
+
+        // Check for comments
+        if (entry.changes?.[0]) {
+          const change = entry.changes[0];
+          if (change.field === "comments" && change.value) {
+            senderName = change.value.from?.username || "Instagram User";
+            messageText = change.value.text || "";
+            remoteId = change.value.id || null;
+            type = "COMMENT";
+          }
+        }
+        // Check for DMs
+        else if (entry.messaging?.[0]) {
+          const msg = entry.messaging[0];
+          senderName = msg.sender?.username || "Instagram User";
+          messageText = msg.message?.text || "";
+          remoteId = msg.message?.mid || null;
+          type = "DIRECT_MESSAGE";
+        }
+      }
+    }
+  }
+
+  if (socialAccountId && workspaceId && messageText) {
+    let conversation = await prisma.inboxConversation.findFirst({
+      where: {
+        socialAccountId,
+        senderName,
+        type,
+      },
+    });
+
+    if (!conversation) {
+      conversation = await prisma.inboxConversation.create({
+        data: {
+          workspaceId,
+          socialAccountId,
+          senderName,
+          senderAvatar,
+          lastMessage: messageText,
+          lastMessageAt: new Date(),
+          type,
+          remoteId,
+        },
+      });
+    } else {
+      await prisma.inboxConversation.update({
+        where: { id: conversation.id },
+        data: {
+          lastMessage: messageText,
+          lastMessageAt: new Date(),
+          isRead: false,
+        },
+      });
+    }
+
+    await prisma.inboxMessage.create({
+      data: {
+        conversationId: conversation.id,
+        senderType: SenderType.USER,
+        messageText,
+      },
+    });
+  }
+}
 
 export async function GET(
   req: Request,
@@ -66,6 +157,22 @@ export async function POST(
         status: "PENDING",
       },
     });
+
+    // Process inline immediately for Vercel / serverless environment
+    let inlineSuccess = false;
+    try {
+      await processWebhookInline(platform, payload);
+      inlineSuccess = true;
+    } catch (err) {
+      console.error("[Webhook Inline Process Error]:", err);
+    }
+
+    if (inlineSuccess) {
+      await prisma.webhookEvent.update({
+        where: { id: event.id },
+        data: { status: "PROCESSED", processedAt: new Date() },
+      });
+    }
 
     await enqueueWebhook({ webhookEventId: event.id });
     return NextResponse.json({ ok: true, id: event.id });
