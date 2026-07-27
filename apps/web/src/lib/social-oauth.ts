@@ -97,7 +97,7 @@ export function buildPlatformAuthorizeUrl(opts: {
 
   switch (provider) {
     case "FACEBOOK": {
-      const scope = "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement";
+      const scope = "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management";
       return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "INSTAGRAM": {
@@ -522,8 +522,18 @@ async function exchangeFacebook(
         };
       }
     } else {
-      console.warn("[Facebook OAuth] No pages returned from Graph API (/me/accounts, /me/assigned_pages).");
-      throw new Error("Facebook Sayfası bulunamadı. Lütfen Facebook giriş ekranında 'Jaglion' sayfasını işaretlediğinizden emin olun.");
+      let permsInfo = "unknown";
+      try {
+        const permRes = await fetch(
+          `https://graph.facebook.com/v19.0/me/permissions?access_token=${encodeURIComponent(userToken)}`
+        );
+        const permsJson = await permRes.json();
+        permsInfo = permsJson.data?.map((p: any) => `${p.permission}:${p.status}`).join(", ") || "empty";
+      } catch {
+        /* ignore */
+      }
+      console.warn("[Facebook OAuth] No pages returned from Graph API. Perms:", permsInfo);
+      throw new Error(`Facebook Sayfası bulunamadı. (İzinler: ${permsInfo})`);
     }
   }
 
