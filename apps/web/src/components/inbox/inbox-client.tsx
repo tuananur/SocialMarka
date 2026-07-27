@@ -175,9 +175,11 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
   }
 
   const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   async function handleSync() {
     setSyncing(true);
+    setSyncStatus(null);
     try {
       const res = await fetch("/api/inbox/sync", { method: "POST" });
       const data = await res.json();
@@ -186,9 +188,13 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
         if (!activeId && data.conversations[0]?.id) {
           setActiveId(data.conversations[0].id);
         }
+        const count = data.conversations.length;
+        setSyncStatus(`Senkronizasyon tamamlandı: ${count} aktif konuşma / yorum bulundu.`);
+      } else {
+        setSyncStatus(`Senkronizasyon uyarısı: ${data.error || "Sunucu yanıt vermedi"}`);
       }
-    } catch (err) {
-      console.error("[InboxClient] Sync failed:", err);
+    } catch (err: any) {
+      setSyncStatus(`Senkronizasyon hatası: ${err?.message || err}`);
     } finally {
       setSyncing(false);
     }
@@ -257,6 +263,13 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
           </div>
         </div>
       </div>
+
+      {syncStatus && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-medium text-sky-800 flex items-center justify-between shadow-sm">
+          <span>{syncStatus}</span>
+          <button type="button" onClick={() => setSyncStatus(null)} className="font-bold hover:text-sky-900 ml-2">✕</button>
+        </div>
+      )}
 
       <Card className="min-h-[580px] min-w-0 overflow-hidden border border-ink-200 bg-white shadow-sm">
         {mainTab === "messages" ? (
