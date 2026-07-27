@@ -96,13 +96,13 @@ export function buildPlatformAuthorizeUrl(opts: {
   if (!creds) return null;
 
   switch (provider) {
-    case "FACEBOOK":
-    case "INSTAGRAM": {
-      const scope =
-        provider === "INSTAGRAM"
-          ? "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement"
-          : "pages_show_list,pages_manage_posts,pages_read_engagement,business_management";
+    case "FACEBOOK": {
+      const scope = "pages_show_list,pages_manage_posts,pages_read_engagement,business_management";
       return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
+    }
+    case "INSTAGRAM": {
+      const scope = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments";
+      return `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "LINKEDIN": {
       return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc("openid profile email w_member_social")}`;
