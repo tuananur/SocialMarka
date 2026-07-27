@@ -222,7 +222,13 @@ export async function POST(
       }
     }
     return NextResponse.json({ ok: true, id: event.id });
-  } catch {
+  } catch (err) {
+    console.log("[Webhook Duplicate Event] Processing inline anyway for eventId:", eventId);
+    try {
+      await processWebhookInline(platform, payload);
+    } catch (inlineErr) {
+      console.error("[Webhook Duplicate Inline Process Error]:", inlineErr);
+    }
     return NextResponse.json({ ok: true, duplicate: true });
   }
 }
