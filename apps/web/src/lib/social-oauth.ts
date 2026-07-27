@@ -487,7 +487,6 @@ async function exchangeFacebook(
         console.error("[Facebook OAuth Direct IG] fetch failed:", err.message || err);
       }
     }
-  }
 
   return {
     accessToken: userToken,
