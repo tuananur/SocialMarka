@@ -124,9 +124,7 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
 
   // Konsolda kayıtlı URI — yeni /api/auth/*/callback ile uyum için aynı path
   const callbackUri = `${oauthOrigin}${oauthCallbackPath(platform)}`;
-  const hasCreds = (platform === "INSTAGRAM")
-    ? hasPlatformOAuthCredentials("FACEBOOK")
-    : hasPlatformOAuthCredentials(platform);
+  const hasCreds = hasPlatformOAuthCredentials(platform);
   const allowSim =
     forceLocal ||
     !hasCreds ||
@@ -299,6 +297,7 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
     }
   }
 
+  // --- Sayfa seçim sihirbazı (Facebook/Instagram çoklu sayfa) ---
   if (multipleAccounts && multipleAccounts.length > 0) {
     const list = multipleAccounts.map((acc: any) => ({
       accessToken: acc.accessToken,
@@ -320,7 +319,7 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
 
     const response = NextResponse.redirect(new URL(`/accounts/select?provider=${provider}`, origin));
     response.cookies.set("sm_temp_import_pages", cookieVal, {
-      maxAge: 900, // 15 mins
+      maxAge: 900,
       path: "/",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -328,7 +327,7 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
     return response;
   }
 
-  // Single account direct save
+  // --- Tek hesap doğrudan kaydet ---
   const item = {
     accessToken,
     refreshToken,
