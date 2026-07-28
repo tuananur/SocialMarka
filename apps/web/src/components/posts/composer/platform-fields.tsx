@@ -184,7 +184,7 @@ export function PlatformFields({
             ))}
           </div>
         </div>
-        <div className="rounded-xl border border-ink-200 bg-[#fafbfc]">
+        <div className="rounded-xl border border-ink-200 bg-[#fafbfc] dark:bg-ink-950 dark:border-ink-800">
           <button
             type="button"
             className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-semibold text-ink-800"

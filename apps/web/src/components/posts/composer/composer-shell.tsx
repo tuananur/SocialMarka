@@ -221,7 +221,7 @@ export function ComposerShell({
   const draftDisabled = !canEdit || busy || !composer.hasCaption;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 top-14 z-[25] flex flex-col bg-[#f3f5f7] md:left-[15.5rem]">
+    <div className="fixed inset-x-0 bottom-0 top-14 z-[25] flex flex-col bg-[#f3f5f7] dark:bg-ink-950 md:left-[15.5rem]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-200/80 bg-white px-4 py-0">
         <div className="flex items-center gap-0">
           <span className="relative px-4 py-3.5 text-sm font-semibold text-ink-900">
@@ -295,7 +295,7 @@ export function ComposerShell({
             <button
               type="button"
               disabled={!canEdit || busy || composer.mediaItems.length >= maxFiles}
-              className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink-200 bg-[#fafbfc] px-4 text-center transition hover:border-accent/50 hover:bg-brand-50/30 disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-ink-200 bg-[#fafbfc] dark:bg-ink-900 dark:border-ink-800 px-4 text-center transition hover:border-accent/50 hover:bg-brand-50/30 disabled:cursor-not-allowed disabled:opacity-60 ${
                 composer.mediaItems.length ? "py-4" : "py-8"
               }`}
               onDragOver={(e) => {
