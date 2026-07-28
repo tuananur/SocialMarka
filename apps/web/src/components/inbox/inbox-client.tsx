@@ -108,6 +108,31 @@ export function InboxClient({
   const [activities, setActivities] = useState<Activity[]>(initialActivities && initialActivities.length > 0 ? initialActivities : INITIAL_ACTIVITIES);
   const [activityFilter, setActivityFilter] = useState<"ALL" | "LIKE" | "FOLLOW" | "REPOST" | "SAVE">("ALL");
 
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type?: "danger" | "info";
+    confirmText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "danger",
+    confirmText: "Tamam",
+  });
+
+  const showAlert = (title: string, description: string) => {
+    setModalConfig({
+      isOpen: true,
+      title,
+      description,
+      type: "info",
+      confirmText: "Anladım",
+    });
+  };
+
   const filteredConversations = useMemo(() => {
     return conversations.filter((c) => {
       // Filter by type
@@ -169,7 +194,7 @@ export function InboxClient({
       );
       setReply("");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Hata");
+      showAlert("Yorum Yanıtı İletilemedi", e instanceof Error ? e.message : "Yanıt gönderilirken bir hata oluştu.");
     } finally {
       setBusy(false);
     }
@@ -217,8 +242,18 @@ export function InboxClient({
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  async function handleDeleteConversation(id: string) {
-    if (!confirm("Bu konuşmayı ve varsa yorumu canlı sosyal medyadan silmek istediğinize emin misiniz?")) return;
+  function requestDeleteConversation(id: string) {
+    setModalConfig({
+      isOpen: true,
+      title: "Konuşmayı ve Yorumu Sil",
+      description: "Bu konuşmayı ve varsa bağlı canlı sosyal medya yorumunu silmek istediğinize emin misiniz?",
+      type: "danger",
+      confirmText: "Evet, Sil",
+      onConfirm: () => executeDeleteConversation(id),
+    });
+  }
+
+  async function executeDeleteConversation(id: string) {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/inbox/conversations/${id}`, { method: "DELETE" });
@@ -230,10 +265,10 @@ export function InboxClient({
           setActiveId(remaining[0]?.id || null);
         }
       } else {
-        alert(data.error || "Silme işlemi sırasında bir hata oluştu.");
+        showAlert("Silme İşlemi Başarısız", data.error || "Silme işlemi sırasında bir hata oluştu.");
       }
     } catch (err: any) {
-      alert(err?.message || "Silme hatası oluştu.");
+      showAlert("Silme Hatası", err?.message || "Silme hatası oluştu.");
     } finally {
       setDeletingId(null);
     }
@@ -432,7 +467,7 @@ export function InboxClient({
                         size="sm"
                         variant="outline"
                         isDisabled={deletingId === active.id}
-                        onClick={() => handleDeleteConversation(active.id)}
+                        onClick={() => requestDeleteConversation(active.id)}
                         className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-medium h-8"
                       >
                         {deletingId === active.id ? "Siliniyor..." : "Sil"}
@@ -609,6 +644,57 @@ export function InboxClient({
           </div>
         )}
       </Card>
+
+      {/* Modern In-App Custom Modal (Replaces Browser Default Alert & Confirm Popups) */}
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg ${
+                  modalConfig.type === "danger"
+                    ? "bg-rose-100 text-rose-600 dark:bg-rose-950/50"
+                    : "bg-sky-100 text-sky-600 dark:bg-sky-950/50"
+                }`}
+              >
+                {modalConfig.type === "danger" ? "🗑️" : "ℹ️"}
+              </div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                {modalConfig.title}
+              </h3>
+            </div>
+
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              {modalConfig.description}
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              {modalConfig.type === "danger" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
+                  className="border-slate-200 text-slate-700 hover:bg-slate-50 font-medium"
+                >
+                  İptal
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant={modalConfig.type === "danger" ? "danger" : "primary"}
+                onClick={() => {
+                  const cb = modalConfig.onConfirm;
+                  setModalConfig((prev) => ({ ...prev, isOpen: false }));
+                  if (cb) cb();
+                }}
+                className="font-semibold px-4"
+              >
+                {modalConfig.confirmText || "Tamam"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
