@@ -123,14 +123,6 @@ export function DashboardShell({
         </nav>
 
         <div className="space-y-2 border-t border-ink-100 p-4">
-          {isAdmin ? (
-            <Link
-              href="/admin"
-              className="block rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-semibold text-amber-900 hover:bg-amber-100"
-            >
-              Yönetim paneli →
-            </Link>
-          ) : null}
           <span className="inline-flex max-w-full truncate rounded-lg bg-ink-50 px-2.5 py-1 text-[11px] font-medium text-ink-600">
             Rol: {roleLabel(user.role)}
           </span>
