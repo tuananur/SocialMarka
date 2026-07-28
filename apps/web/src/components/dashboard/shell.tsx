@@ -59,7 +59,7 @@ export function DashboardShell({
   }, [mobileOpen]);
 
   return (
-    <div className="dashboard-shell flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#f5f8fc_0%,#eef3f9_100%)] text-ink-900">
+    <div className="dashboard-shell flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#f5f8fc_0%,#eef3f9_100%)] dark:bg-none dark:bg-slate-950 text-ink-900 dark:text-white">
       {mobileOpen ? (
         <button
           type="button"
@@ -70,25 +70,27 @@ export function DashboardShell({
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[15.5rem] flex-col border-r border-ink-200/70 bg-white/95 shadow-[var(--shadow-soft)] backdrop-blur-xl transition-transform duration-200 ease-out md:sticky md:top-0 md:z-30 md:h-dvh md:translate-x-0 md:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[15.5rem] flex-col border-r border-ink-200/70 dark:border-slate-800/70 bg-white/95 dark:bg-slate-900/95 shadow-[var(--shadow-soft)] backdrop-blur-xl transition-transform duration-200 ease-out md:sticky md:top-0 md:z-30 md:h-dvh md:translate-x-0 md:shadow-none ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-4 py-4">
+        <div className="flex items-center justify-between gap-2 border-b border-ink-100 dark:border-slate-800/70 px-4 py-4">
           <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-400 text-[10px] font-medium tracking-wide text-white">
               SM
             </span>
             <span className="min-w-0">
-              <span className="block truncate font-display text-base font-medium tracking-tight text-ink-900">
+              <span className="block truncate font-display text-base font-medium tracking-tight text-ink-900 dark:text-white">
                 SocialMarka
               </span>
-              <span className="block truncate text-[11px] text-ink-400">{user.workspaceName}</span>
+              <span className="block truncate text-[11px] text-ink-400">
+                {user.workspaceName}
+              </span>
             </span>
           </Link>
           <button
             type="button"
-            className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50 md:hidden"
+            className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50 dark:hover:bg-slate-800 md:hidden"
             onClick={() => setMobileOpen(false)}
             aria-label="Kapat"
           >
@@ -106,13 +108,13 @@ export function DashboardShell({
                 className={`block rounded-xl px-3 py-2.5 transition ${
                   active
                     ? "bg-accent text-white shadow-sm shadow-accent/20"
-                    : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
+                    : "text-ink-600 dark:text-slate-300 hover:bg-ink-50 dark:hover:bg-slate-800 hover:text-ink-900 dark:hover:text-white"
                 }`}
               >
                 <span className="block text-sm font-medium leading-none">{item.label}</span>
                 <span
                   className={`mt-1 block text-[11px] ${
-                    active ? "text-white/75" : "text-ink-400"
+                    active ? "text-white/75" : "text-ink-400 dark:text-slate-500"
                   }`}
                 >
                   {item.hint}
@@ -122,15 +124,15 @@ export function DashboardShell({
           })}
         </nav>
 
-        <div className="space-y-2 border-t border-ink-100 p-4">
-          <span className="inline-flex max-w-full truncate rounded-lg bg-ink-50 px-2.5 py-1 text-[11px] font-medium text-ink-600">
+        <div className="space-y-2 border-t border-ink-100 dark:border-slate-800/70 p-4">
+          <span className="inline-flex max-w-full truncate rounded-lg bg-ink-50 dark:bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-ink-600 dark:text-slate-300">
             Rol: {roleLabel(user.role)}
           </span>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-ink-200/70 bg-white/85 px-4 backdrop-blur-xl sm:px-6">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-ink-200/70 dark:border-slate-800/70 bg-white/85 dark:bg-slate-900/85 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"

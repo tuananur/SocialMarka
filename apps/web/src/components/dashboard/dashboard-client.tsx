@@ -262,38 +262,38 @@ export function DashboardClient({
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <Link
           href="/posts"
-          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 dark:hover:border-accent hover:bg-sky-50/20 dark:hover:bg-slate-800 text-center"
         >
-          <span className="text-sm font-bold text-ink-900">Gönderiler</span>
-          <span className="text-[10px] text-ink-400 mt-0.5">Oluştur & Yönet</span>
+          <span className="text-sm font-bold text-ink-900 dark:text-white">Gönderiler</span>
+          <span className="text-[10px] text-ink-400 dark:text-slate-400 mt-0.5">Oluştur & Yönet</span>
         </Link>
         <Link
           href="/calendar"
-          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 dark:hover:border-accent hover:bg-sky-50/20 dark:hover:bg-slate-800 text-center"
         >
-          <span className="text-sm font-bold text-ink-900">Takvim</span>
-          <span className="text-[10px] text-ink-400 mt-0.5">Haftalık Akış</span>
+          <span className="text-sm font-bold text-ink-900 dark:text-white">Takvim</span>
+          <span className="text-[10px] text-ink-400 dark:text-slate-400 mt-0.5">Haftalık Akış</span>
         </Link>
         <Link
           href="/accounts"
-          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 dark:hover:border-accent hover:bg-sky-50/20 dark:hover:bg-slate-800 text-center"
         >
-          <span className="text-sm font-bold text-ink-900">Hesaplar</span>
-          <span className="text-[10px] text-ink-400 mt-0.5">{accounts.length} Bağlı Profil</span>
+          <span className="text-sm font-bold text-ink-900 dark:text-white">Hesaplar</span>
+          <span className="text-[10px] text-ink-400 dark:text-slate-400 mt-0.5">{accounts.length} Bağlı Profil</span>
         </Link>
         <Link
           href="/analytics"
-          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 dark:hover:border-accent hover:bg-sky-50/20 dark:hover:bg-slate-800 text-center"
         >
-          <span className="text-sm font-bold text-ink-900">Analitik</span>
-          <span className="text-[10px] text-ink-400 mt-0.5">Gösterim & Takipçi</span>
+          <span className="text-sm font-bold text-ink-900 dark:text-white">Analitik</span>
+          <span className="text-[10px] text-ink-400 dark:text-slate-400 mt-0.5">Gösterim & Takipçi</span>
         </Link>
         <Link
           href="/inbox"
-          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
+          className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 dark:hover:border-accent hover:bg-sky-50/20 dark:hover:bg-slate-800 text-center"
         >
-          <span className="text-sm font-bold text-ink-900">Mesajlar</span>
-          <span className="text-[10px] text-ink-400 mt-0.5">Sosyal Gelen Kutusu</span>
+          <span className="text-sm font-bold text-ink-900 dark:text-white">Mesajlar</span>
+          <span className="text-[10px] text-ink-400 dark:text-slate-400 mt-0.5">Sosyal Gelen Kutusu</span>
         </Link>
         {role === "ADMIN" || role === "SYSTEM_ADMIN" ? (
           <div className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-100 bg-ink-50/30 text-center">

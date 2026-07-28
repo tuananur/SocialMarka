@@ -37,7 +37,7 @@ export function AdminShell({
   }, [pathname]);
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#0f172a_0%,#1e293b_45%,#f1f5f9_45%)] text-ink-900">
+    <div className="flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#0f172a_0%,#1e293b_45%,#f1f5f9_45%)] dark:bg-none dark:bg-slate-950 text-ink-900 dark:text-white">
       {mobileOpen ? (
         <button
           type="button"
