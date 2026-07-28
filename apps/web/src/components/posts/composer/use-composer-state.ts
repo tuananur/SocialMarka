@@ -32,6 +32,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
   const [pinTitle, setPinTitle] = useState("");
   const [pinLink, setPinLink] = useState("");
   const [pinAlt, setPinAlt] = useState(false);
+  const [pinHashtags, setPinHashtags] = useState("");
   const [ytPrivacy, setYtPrivacy] = useState<YtPrivacy>("public");
   const [ytTags, setYtTags] = useState("");
   const [ytAdvanceOpen, setYtAdvanceOpen] = useState(false);
@@ -123,6 +124,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
     setPinTitle("");
     setPinLink("");
     setPinAlt(false);
+    setPinHashtags("");
     setYtPrivacy("public");
     setYtTags("");
     setYtAdvanceOpen(false);
@@ -169,6 +171,8 @@ export function useComposerState(accounts: ComposerAccount[]) {
         const link = raw.match(/Link:\s*(.+)/i);
         if (link && provider === "PINTEREST") setPinLink(link[1].trim());
         if (/Alt text:\s*açık/i.test(raw) && provider === "PINTEREST") setPinAlt(true);
+        const hashtags = raw.match(/\[Hashtags\]:\s*(.+)/i);
+        if (hashtags && provider === "PINTEREST") setPinHashtags(hashtags[1].trim());
       }
     }
     setPlatformContents(pc);
@@ -201,9 +205,28 @@ export function useComposerState(accounts: ComposerAccount[]) {
     setDraftText(current + snippet);
   }
 
-  function applyAiCaption() {
-    const pick = AI_CAPTION_TEMPLATES[Math.floor(Math.random() * AI_CAPTION_TEMPLATES.length)];
-    setDraftText(pick);
+  async function applyAiCaption() {
+    try {
+      const media = mediaItems[0];
+      const res = await fetch("/api/ai/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mediaUrl: media?.url || null,
+          mediaMime: media?.mimeType || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.caption) {
+        setDraftText(data.caption);
+      } else {
+        const pick = AI_CAPTION_TEMPLATES[Math.floor(Math.random() * AI_CAPTION_TEMPLATES.length)];
+        setDraftText(pick);
+      }
+    } catch {
+      const pick = AI_CAPTION_TEMPLATES[Math.floor(Math.random() * AI_CAPTION_TEMPLATES.length)];
+      setDraftText(pick);
+    }
   }
 
   function applyLocation() {
@@ -238,6 +261,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
       pinTitle,
       pinLink,
       pinAlt,
+      pinHashtags,
       ytPrivacy,
       ytTags,
       selectedProviders: providers,
@@ -306,6 +330,8 @@ export function useComposerState(accounts: ComposerAccount[]) {
     setPinLink,
     pinAlt,
     setPinAlt,
+    pinHashtags,
+    setPinHashtags,
     ytPrivacy,
     setYtPrivacy,
     ytTags,

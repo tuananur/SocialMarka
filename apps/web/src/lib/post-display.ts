@@ -20,6 +20,7 @@ export type ManagePost = {
   scheduledAt: string | null;
   media?: PostMedia[];
   targets: ManagePostTarget[];
+  isDeleted?: boolean;
 };
 
 /** Reject pending/placeholder URLs that break <img>/<video> */

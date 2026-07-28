@@ -70,6 +70,27 @@ export async function DELETE(_req: Request, { params }: Params) {
     }
   }
 
+  const { searchParams } = new URL(_req.url);
+  const permanent = searchParams.get("permanent") === "true";
+
+  if (permanent) {
+    await prisma.mediaAsset.deleteMany({
+      where: { postId: id },
+    });
+    await prisma.post.delete({
+      where: { id, workspaceId: ctx.workspaceId },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "POST_PERMANENTLY_DELETED",
+        details: { postId: id },
+        userId: ctx.userId,
+        workspaceId: ctx.workspaceId,
+      },
+    });
+    return NextResponse.json({ ok: true, permanent: true });
+  }
+
   // Soft delete the post in DB
   await prisma.post.update({
     where: { id },

@@ -23,8 +23,13 @@ export default async function CreateAccountPage() {
     }),
     prisma.socialAccount.findMany({
       where: { workspaceId, status: { not: "DISCONNECTED" } },
-      select: { provider: true },
-      distinct: ["provider"],
+      select: {
+        id: true,
+        provider: true,
+        accountName: true,
+        providerAccountId: true,
+        profilePicUrl: true,
+      },
     }),
   ]);
 
@@ -38,7 +43,8 @@ export default async function CreateAccountPage() {
       />
       <Suspense fallback={<div className="text-sm text-ink-400">Yükleniyor…</div>}>
         <ConnectPlatformCards
-          connectedProviders={connected.map((c) => c.provider)}
+          connectedProviders={Array.from(new Set(connected.map((c) => c.provider)))}
+          connectedAccounts={connected}
           readyProviders={readyProviders}
           atLimit={accountCount >= accountLimit}
         />

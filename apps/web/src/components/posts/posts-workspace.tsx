@@ -272,7 +272,11 @@ export function PostsWorkspace({
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
+      const post = posts.find((p) => p.id === postId);
+      const isPostDeleted = post && (post as any).isDeleted;
+      const url = isPostDeleted ? `/api/posts/${postId}?permanent=true` : `/api/posts/${postId}`;
+
+      const res = await fetch(url, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Silinemedi");
       if (detailPost?.id === postId) setDetailPost(null);
@@ -280,7 +284,11 @@ export function PostsWorkspace({
         setMode("list");
         composer.resetCompose();
       }
-      setMessage("Gönderi silindi (Silinenler klasörüne taşındı).");
+      if (isPostDeleted) {
+        setMessage("Gönderi kalıcı olarak silindi.");
+      } else {
+        setMessage("Gönderi silindi (Silinenler klasörüne taşındı).");
+      }
       await refresh();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Silinemedi");

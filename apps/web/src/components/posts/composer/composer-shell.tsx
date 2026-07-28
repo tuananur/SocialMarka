@@ -133,6 +133,38 @@ export function ComposerShell({
     return "09:00";
   });
 
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
+  const [isSaveDraftMenuOpen, setIsSaveDraftMenuOpen] = useState(false);
+  const [aiSuggestedRange, setAiSuggestedRange] = useState("1");
+
+  const suggestedTimes = useMemo(() => {
+    const list: { label: string; date: string; time: string }[] = [];
+    const now = new Date();
+    const daysToGen = parseInt(aiSuggestedRange, 10) || 1;
+    const hours = [12, 15, 18, 20];
+    const pad = (n: number) => String(n).padStart(2, "0");
+    for (let i = 0; i <= daysToGen; i++) {
+      const d = new Date();
+      d.setDate(now.getDate() + i);
+      const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const dateLabel = d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+      for (const h of hours) {
+        const slotDate = new Date(d);
+        slotDate.setHours(h, 0, 0, 0);
+        if (slotDate.getTime() > now.getTime()) {
+          const timeStr = `${pad(h)}:00`;
+          list.push({
+            label: `${dateLabel} ${timeStr}`,
+            date: dateStr,
+            time: timeStr,
+          });
+        }
+      }
+    }
+    return list.slice(0, 5);
+  }, [aiSuggestedRange]);
+
   const setScheduledAt = composer.setScheduledAt;
   const scheduledAtVal = composer.scheduledAt;
 
@@ -330,6 +362,8 @@ export function ComposerShell({
             setPinLink={composer.setPinLink}
             pinAlt={composer.pinAlt}
             setPinAlt={composer.setPinAlt}
+            pinHashtags={composer.pinHashtags}
+            setPinHashtags={composer.setPinHashtags}
             ytPrivacy={composer.ytPrivacy}
             setYtPrivacy={composer.setYtPrivacy}
             ytTags={composer.ytTags}
@@ -383,99 +417,135 @@ export function ComposerShell({
             </p>
           ) : null}
 
-          <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-ink-100 pt-4">
-            <div className="flex flex-col gap-3 min-w-[280px] flex-1 bg-ink-50/50 p-4 rounded-xl border border-ink-200/60">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-ink-500">
-                Zamanlama
-              </label>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Date Selection */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-ink-400 mb-1">
-                    Tarih
-                  </label>
-                  <Input
-                    type="date"
-                    fullWidth
-                    value={selectedDate}
-                    onChange={(e) => handleDateChange(e.target.value)}
-                    disabled={!canEdit}
-                  />
-                </div>
-
-                {/* Hour Range (Saat Aralığı) Selection */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-ink-400 mb-1">
-                    Saat Aralığı
-                  </label>
-                  <select
-                    value={selectedRangeId}
-                    onChange={(e) => handleRangeChange(e.target.value)}
-                    disabled={!canEdit}
-                    className="w-full h-10 px-3 rounded-xl border border-ink-200 bg-white text-sm outline-none focus:border-accent disabled:opacity-60 font-medium"
-                  >
-                    {TIME_RANGES.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Exact Time Slot Selection */}
-              <div>
-                <label className="block text-[11px] font-semibold text-ink-400 mb-1.5">
-                  Zaman Seçin
-                </label>
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 max-h-[120px] overflow-y-auto pr-1">
-                  {getTimeSlotsForRange(selectedRangeId).map((slot) => {
-                    const isSelected = selectedTime === slot;
-                    return (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => handleTimeChange(slot)}
-                        disabled={!canEdit}
-                        className={`py-1.5 px-2 text-xs font-semibold rounded-lg border text-center transition duration-150 ${
-                          isSelected
-                            ? "bg-accent border-accent text-white shadow-sm font-bold"
-                            : "bg-white border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300"
-                        }`}
-                      >
-                        {slot}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-ink-100 pt-4 dark:border-ink-800">
+            <div>
+              <p className="text-xs text-ink-400">
+                Zamanlama ayarlarını görmek ve yapay zeka önerilerini incelemek için sağdaki butona tıklayın.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="font-semibold"
-                isDisabled={draftDisabled}
-                onPress={onSaveDraft}
-              >
-                Taslak Kaydet
-              </Button>
-              <Button
-                variant="secondary"
-                className="font-semibold"
-                isDisabled={shareDisabled}
-                onPress={onShareNow}
-              >
-                Hemen Paylaş
-              </Button>
-              <Button
-                variant="primary"
-                className="font-semibold shadow-md shadow-accent/25"
-                isDisabled={scheduleDisabled}
-                onPress={onSchedule}
-              >
-                Zamanla
-              </Button>
+              {/* Draft split button group */}
+              <div className="relative flex items-center">
+                <Button
+                  variant="outline"
+                  className="rounded-r-none font-semibold"
+                  isDisabled={draftDisabled}
+                  onPress={onSaveDraft}
+                >
+                  Taslak Kaydet
+                </Button>
+                <div className="h-10 w-[1px] bg-ink-200 dark:bg-ink-800" />
+                <Button
+                  variant="outline"
+                  className="rounded-l-none px-2.5 font-semibold"
+                  isDisabled={draftDisabled}
+                  onPress={() => setIsSaveDraftMenuOpen(!isSaveDraftMenuOpen)}
+                >
+                  ▲
+                </Button>
+                {isSaveDraftMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsSaveDraftMenuOpen(false)} />
+                    <div className="absolute left-0 bottom-12 z-50 min-w-[150px] rounded-xl border border-ink-200 bg-white p-1 shadow-xl dark:bg-ink-950 dark:border-ink-800">
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-800"
+                        onClick={() => {
+                          setIsSaveDraftMenuOpen(false);
+                          onSaveDraft();
+                        }}
+                      >
+                        📂 Taslak Olarak Kaydet
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Schedule split button group */}
+              <div className="relative flex items-center">
+                <Button
+                  variant="primary"
+                  className="rounded-r-none pr-3 font-semibold shadow-md shadow-accent/20"
+                  isDisabled={scheduleDisabled}
+                  onPress={() => setIsScheduleModalOpen(true)}
+                >
+                  📅 Zamanlama Ayarla
+                </Button>
+                <div className="h-10 w-[1px] bg-white/30" />
+                <Button
+                  variant="primary"
+                  className="rounded-l-none px-2.5 font-semibold shadow-md shadow-accent/20"
+                  isDisabled={scheduleDisabled}
+                  onPress={() => setIsScheduleMenuOpen(!isScheduleMenuOpen)}
+                >
+                  ▲
+                </Button>
+                {isScheduleMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsScheduleMenuOpen(false)} />
+                    <div className="absolute right-0 bottom-12 z-50 min-w-[160px] rounded-xl border border-ink-200 bg-white p-1 shadow-xl dark:bg-ink-950 dark:border-ink-800">
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-800"
+                        onClick={() => {
+                          setIsScheduleMenuOpen(false);
+                          onShareNow();
+                        }}
+                        disabled={shareDisabled}
+                      >
+                        <span>🚀</span> Hemen Paylaş
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-800"
+                        onClick={() => {
+                          setIsScheduleMenuOpen(false);
+                          if (suggestedTimes.length > 0) {
+                            handleDateChange(suggestedTimes[0].date);
+                            handleTimeChange(suggestedTimes[0].time);
+                            setTimeout(() => onSchedule(), 100);
+                          } else {
+                            onSchedule();
+                          }
+                        }}
+                        disabled={scheduleDisabled}
+                      >
+                        <span>⏰</span> Sıradakine Paylaş
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-800"
+                        onClick={() => {
+                          setIsScheduleMenuOpen(false);
+                          const qDate = new Date();
+                          qDate.setHours(qDate.getHours() + 2);
+                          const pad = (n: number) => String(n).padStart(2, "0");
+                          const dStr = `${qDate.getFullYear()}-${pad(qDate.getMonth() + 1)}-${pad(qDate.getDate())}`;
+                          const tStr = `${pad(qDate.getHours())}:${pad(qDate.getMinutes())}`;
+                          handleDateChange(dStr);
+                          handleTimeChange(tStr);
+                          setTimeout(() => onSchedule(), 100);
+                        }}
+                        disabled={scheduleDisabled}
+                      >
+                        <span>📋</span> Kuyruğa Ekle
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:bg-ink-50 dark:text-ink-300 dark:hover:bg-ink-800"
+                        onClick={() => {
+                          setIsScheduleMenuOpen(false);
+                          setIsScheduleModalOpen(true);
+                        }}
+                        disabled={scheduleDisabled}
+                      >
+                        <span>🔄</span> Tekrarla
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -512,6 +582,7 @@ export function ComposerShell({
                 text={composer.draftText || composer.content}
                 mediaUrl={composer.mediaPreview}
                 mediaMime={composer.mediaMime}
+                format={composer.activeFormat}
               />
             ) : null}
             {rightTab === "comments" ? (
@@ -544,6 +615,123 @@ export function ComposerShell({
           </div>
         </aside>
       </div>
+
+      {/* Schedule Post Modal Dialog (Image 2) */}
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6">
+          <div
+            className="absolute inset-0 bg-ink-950/45 backdrop-blur-[2px]"
+            onClick={() => setIsScheduleModalOpen(false)}
+          />
+          <div className="relative flex w-full max-w-2xl flex-col rounded-2xl border border-ink-200 bg-white p-6 shadow-2xl animate-mega-in dark:bg-ink-950 dark:border-ink-800">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-ink-100 pb-3 dark:border-ink-800">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📅</span>
+                <h2 className="text-base font-semibold text-ink-900 dark:text-white">Zamanlama Ayarla</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsScheduleModalOpen(false)}
+                className="rounded-lg p-1.5 text-ink-500 hover:bg-ink-50 dark:text-ink-400 dark:hover:bg-ink-800"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+              {/* Left Side: Inputs */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-500 dark:text-ink-400 mb-1">Tarih</label>
+                  <Input
+                    type="date"
+                    fullWidth
+                    value={selectedDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-500 dark:text-ink-400 mb-1">Saat</label>
+                  <Input
+                    type="time"
+                    fullWidth
+                    value={selectedTime}
+                    onChange={(e) => handleTimeChange(e.target.value)}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                  onClick={() => setIsScheduleModalOpen(false)}
+                >
+                  + Zamanlama Ekle
+                </button>
+              </div>
+              
+              {/* Right Side: Suggested Times */}
+              <div className="border-l border-ink-100 pl-6 dark:border-ink-800">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-ink-500 dark:text-ink-400">✨ Önerilen Zamanlar</span>
+                  <select
+                    value={aiSuggestedRange}
+                    onChange={(e) => setAiSuggestedRange(e.target.value)}
+                    className="text-xs border border-ink-200 rounded px-1.5 py-0.5 bg-white dark:bg-ink-900 dark:border-ink-800"
+                  >
+                    <option value="1">1 Gün</option>
+                    <option value="3">3 Gün</option>
+                    <option value="7">7 Gün</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                  {suggestedTimes.map((item, idx) => (
+                    <label key={idx} className="flex items-center gap-2.5 text-xs text-ink-700 dark:text-ink-300 cursor-pointer hover:text-accent">
+                      <input
+                        type="checkbox"
+                        checked={selectedDate === item.date && selectedTime === item.time}
+                        onChange={() => {
+                          handleDateChange(item.date);
+                          handleTimeChange(item.time);
+                        }}
+                        className="rounded border-ink-300 accent-accent"
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  ))}
+                  {suggestedTimes.length === 0 && (
+                    <p className="text-xs text-ink-400 italic">Uygun öneri bulunamadı.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-ink-100 pt-4 dark:border-ink-800">
+              <Button
+                variant="outline"
+                onPress={() => setIsScheduleModalOpen(false)}
+              >
+                İptal
+              </Button>
+              <Button
+                variant="primary"
+                className="font-semibold shadow-md shadow-accent/25"
+                isDisabled={scheduleDisabled}
+                onPress={() => {
+                  onSchedule();
+                  setIsScheduleModalOpen(false);
+                }}
+              >
+                Zamanla
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

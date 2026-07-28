@@ -29,6 +29,7 @@ export default async function PostsPage() {
         content: true,
         status: true,
         scheduledAt: true,
+        isDeleted: true,
         media: {
           select: { id: true, thumbnailUrl: true, originalUrl: true, mimeType: true },
           take: 1,

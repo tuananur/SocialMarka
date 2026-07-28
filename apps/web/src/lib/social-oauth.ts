@@ -893,6 +893,21 @@ async function exchangePinterest(code: string, redirectUri: string): Promise<Exc
   };
 }
 
+export function getApiOrigin(req?: Request) {
+  const envApi = process.env.NEXT_PUBLIC_API_URL;
+  if (envApi && !envApi.includes("localhost") && !envApi.includes("127.0.0.1")) {
+    return envApi.replace(/\/$/, "");
+  }
+  if (req) {
+    const origin = getAppOrigin(req);
+    if (origin.includes("app.socialmarka.com")) {
+      return origin.replace("app.socialmarka.com", "api.socialmarka.com");
+    }
+    return origin;
+  }
+  return envApi || "http://localhost:3000";
+}
+
 export function getAppOrigin(req: Request) {
   // Prefer the live request host on Vercel so localhost env cannot poison redirect_uri
   const hostHeader =
@@ -918,8 +933,10 @@ export function getAppOrigin(req: Request) {
  * so localhost / mis-set env cannot send http://… and get mislabeled as client_key.
  */
 export function getOAuthRedirectOrigin(req: Request, provider: PlatformType) {
-  if (provider === "TIKTOK") {
+  const apiOrigin = getApiOrigin(req);
+  if (provider === "TIKTOK" && !apiOrigin.startsWith("https://")) {
     const candidates = [
+      process.env.NEXT_PUBLIC_API_URL,
       process.env.NEXT_PUBLIC_APP_URL,
       process.env.NEXTAUTH_URL,
       process.env.AUTH_URL,
@@ -931,9 +948,8 @@ export function getOAuthRedirectOrigin(req: Request, provider: PlatformType) {
         .replace(/\/$/, "");
       if (origin.startsWith("https://")) return origin;
     }
-    return null;
   }
-  return getAppOrigin(req);
+  return apiOrigin;
 }
 
 export function envKeysForProvider(provider: PlatformType): string[] {

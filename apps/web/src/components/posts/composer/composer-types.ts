@@ -98,6 +98,7 @@ export function stripComposerMarkers(text: string): string {
     .replace(/\n*\s*Link:\s*.+$/gim, "")
     .replace(/\n*\s*Alt text:\s*.+$/gim, "")
     .replace(/\n*\s*\[Etiketler\]:\s*.+$/gim, "")
+    .replace(/\n*\s*\[Hashtags\]:\s*.+$/gim, "")
     .trim();
 }
 
@@ -109,6 +110,7 @@ export function buildPlatformContents(opts: {
   pinTitle: string;
   pinLink: string;
   pinAlt: boolean;
+  pinHashtags?: string;
   ytPrivacy: YtPrivacy;
   ytTags: string;
   selectedProviders: string[];
@@ -126,10 +128,15 @@ export function buildPlatformContents(opts: {
     }
 
     if (provider === "PINTEREST") {
-      const bits = [stripComposerMarkers(base)];
+      let desc = stripComposerMarkers(base);
+      if (opts.pinHashtags?.trim()) {
+        desc += `\n\n${opts.pinHashtags.trim()}`;
+      }
+      const bits = [desc];
       if (opts.pinTitle) bits.unshift(`Başlık: ${opts.pinTitle}`);
       if (opts.pinLink) bits.push(`Link: ${opts.pinLink}`);
       if (opts.pinAlt) bits.push("Alt text: açık");
+      if (opts.pinHashtags?.trim()) bits.push(`[Hashtags]: ${opts.pinHashtags.trim()}`);
       base = bits.filter(Boolean).join("\n");
     }
 

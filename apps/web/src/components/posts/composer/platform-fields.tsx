@@ -12,6 +12,8 @@ export function PlatformFields({
   setPinLink,
   pinAlt,
   setPinAlt,
+  pinHashtags = "",
+  setPinHashtags = () => {},
   ytPrivacy,
   setYtPrivacy,
   ytTags,
@@ -27,6 +29,8 @@ export function PlatformFields({
   setPinLink: (v: string) => void;
   pinAlt: boolean;
   setPinAlt: (v: boolean) => void;
+  pinHashtags?: string;
+  setPinHashtags?: (v: string) => void;
   ytPrivacy: YtPrivacy;
   setYtPrivacy: (v: YtPrivacy) => void;
   ytTags: string;
@@ -65,6 +69,82 @@ export function PlatformFields({
             </span>
           </div>
         </div>
+        
+        {/* Pinterest Hashtags Section */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-ink-500 dark:text-ink-400">
+            Hashtagler (Boşluklarla ayırın)
+          </label>
+          <Input
+            fullWidth
+            value={pinHashtags}
+            onChange={(e) => setPinHashtags(e.target.value)}
+            placeholder="ör. #tasarim #dekorasyon"
+            disabled={!canEdit}
+          />
+          <div className="mt-2 flex flex-wrap gap-1">
+            {["#tasarim", "#dekorasyon", "#yemek", "#moda", "#seyahat", "#egitim", "#motivasyon", "#trend", "#diy", "#art"].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition ${
+                  pinHashtags.includes(tag)
+                    ? "bg-accent text-white"
+                    : "bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300"
+                }`}
+                onClick={() => {
+                  if (pinHashtags.includes(tag)) {
+                    setPinHashtags(pinHashtags.replace(tag, "").replace(/\s+/g, " ").trim());
+                  } else {
+                    setPinHashtags(`${pinHashtags} ${tag}`.trim());
+                  }
+                }}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="mt-1.5 text-[11px] font-semibold text-accent hover:underline flex items-center gap-1"
+            onClick={() => {
+              const tagsToAdd: string[] = [];
+              const text = pinTitle.toLowerCase() + " " + (pinLink || "").toLowerCase();
+              if (text.includes("tasarım") || text.includes("dizayn") || text.includes("art") || text.includes("resim")) {
+                tagsToAdd.push("#tasarim", "#art", "#diy");
+              }
+              if (text.includes("ev") || text.includes("oda") || text.includes("dekor") || text.includes("mobilya")) {
+                tagsToAdd.push("#dekorasyon", "#diy");
+              }
+              if (text.includes("yemek") || text.includes("tarif") || text.includes("mutfak") || text.includes("pasta")) {
+                tagsToAdd.push("#yemek", "#tarifler");
+              }
+              if (text.includes("moda") || text.includes("elbise") || text.includes("kombin") || text.includes("tarz")) {
+                tagsToAdd.push("#moda", "#trend");
+              }
+              if (text.includes("seyahat") || text.includes("tatil") || text.includes("gezi")) {
+                tagsToAdd.push("#seyahat");
+              }
+              if (text.includes("basari") || text.includes("motivasyon") || text.includes("girisim") || text.includes("is")) {
+                tagsToAdd.push("#motivasyon", "#egitim");
+              }
+              if (tagsToAdd.length === 0) {
+                tagsToAdd.push("#trend", "#pinterest");
+              }
+              
+              let current = pinHashtags;
+              for (const t of tagsToAdd) {
+                if (!current.includes(t)) {
+                  current = `${current} ${t}`.trim();
+                }
+              }
+              setPinHashtags(current);
+            }}
+          >
+            ✨ Posta Göre Hashtagleri Ayarla
+          </button>
+        </div>
+
         <label className="flex items-center gap-2 text-sm text-ink-600">
           <input
             type="checkbox"

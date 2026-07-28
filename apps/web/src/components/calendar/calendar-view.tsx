@@ -34,6 +34,7 @@ const STATUS_FILTERS = [
   { id: "SCHEDULED", label: "Zamanlandı" },
   { id: "PUBLISHED", label: "Yayınlandı" },
   { id: "FAILED", label: "Hatalı" },
+  { id: "DELETED", label: "Silinenler" },
 ] as const;
 
 export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdit?: boolean }) {
@@ -63,10 +64,16 @@ export function CalendarView({ posts, canEdit = false }: { posts: Post[]; canEdi
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return posts.filter((p) => {
+      if (statusFilter === "DELETED") {
+        if (!p.isDeleted) return false;
+      } else {
+        if (p.isDeleted) return false;
+      }
+
       if (q && !p.content.toLowerCase().includes(q)) return false;
       if (statusFilter === "FAILED") {
         if (p.status !== "FAILED" && p.status !== "PARTIAL_FAILED") return false;
-      } else if (statusFilter !== "ALL" && p.status !== statusFilter) {
+      } else if (statusFilter !== "ALL" && statusFilter !== "DELETED" && p.status !== statusFilter) {
         return false;
       }
       if (providerFilter !== "ALL") {

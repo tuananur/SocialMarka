@@ -138,10 +138,12 @@ const ERROR_MSG: Record<string, string> = {
 
 export function ConnectPlatformCards({
   connectedProviders = [],
+  connectedAccounts = [],
   readyProviders = [],
   atLimit = false,
 }: {
   connectedProviders?: string[];
+  connectedAccounts?: any[];
   readyProviders?: string[];
   atLimit?: boolean;
 }) {
@@ -149,6 +151,8 @@ export function ConnectPlatformCards({
   const error = search.get("error");
   const soon = search.get("soon");
   const [followUs, setFollowUs] = useState(true);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+
   const connected = useMemo(
     () => new Set(connectedProviders.map((p) => p.toUpperCase())),
     [connectedProviders],
@@ -188,6 +192,8 @@ export function ConnectPlatformCards({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {CARDS.map((p) => {
           const isLinked = connected.has(p.id);
+          const platformAccounts = connectedAccounts.filter((acc) => acc.provider === p.id);
+          const isExpanded = expandedCardId === p.id;
           const canConnect = (() => {
             if (p.soon || atLimit) return false;
             if (ready.size === 0) return true; // unknown → allow (server decides)
@@ -198,52 +204,94 @@ export function ConnectPlatformCards({
           return (
             <div
               key={p.id}
-              className={`relative flex flex-col items-center rounded-2xl border bg-white px-5 py-7 text-center shadow-[var(--shadow-soft)] ${
-                isLinked ? "border-emerald-300 ring-1 ring-emerald-100" : "border-ink-200/80"
+              className={`relative flex flex-col items-center rounded-2xl border bg-white p-5 text-center shadow-[var(--shadow-soft)] transition-all duration-200 dark:bg-ink-950 ${
+                isLinked ? "border-emerald-300 ring-1 ring-emerald-100 dark:border-emerald-800 dark:ring-emerald-950" : "border-ink-200/80 dark:border-ink-800"
               }`}
             >
-              {isLinked ? (
-                <span className="absolute right-3 top-3 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                  Bağlı
-                </span>
-              ) : null}
-
-              {p.id === "GBP" ? (
-                <GoogleG size={40} />
-              ) : (
-                <ProviderIcon provider={p.id} size={40} />
-              )}
-              <h3 className="mt-3 text-[15px] font-semibold text-ink-900">{p.name}</h3>
-
-              <div className="mt-4 flex w-full flex-col gap-2">
-                {p.soon || atLimit ? (
-                  <span className="text-sm font-medium text-ink-300">
-                    {p.soon ? "Yakında" : "Limit dolu"}
+              {/* Card Header (Toggle Expansion) */}
+              <div
+                className="flex flex-col items-center w-full cursor-pointer select-none"
+                onClick={() => setExpandedCardId(isExpanded ? null : p.id)}
+              >
+                {isLinked ? (
+                  <span className="absolute right-3 top-3 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                    {platformAccounts.length} Bağlı
                   </span>
-                ) : !canConnect ? (
-                  <Link
-                    href={`/accounts/setup?provider=${p.id.toLowerCase()}`}
-                    className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-100"
-                  >
-                    API kur
-                  </Link>
+                ) : null}
+
+                {p.id === "GBP" ? (
+                  <GoogleG size={40} />
                 ) : (
-                  p.actions.map((a) => {
-                    const href = p.followUs && !followUs ? `${a.href}&follow=0` : a.href;
-                    return (
-                      <a
-                        key={a.label}
-                        href={href}
-                        className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
-                      >
-                        {a.label}
-                      </a>
-                    );
-                  })
+                  <ProviderIcon provider={p.id} size={40} />
                 )}
+                
+                <h3 className="mt-3 text-[15px] font-semibold text-ink-900 dark:text-white flex items-center gap-1.5">
+                  {p.name}
+                  {isLinked && (
+                    <span className="text-[10px] text-ink-400">
+                      {isExpanded ? "▲" : "▼"}
+                    </span>
+                  )}
+                </h3>
               </div>
 
-              {p.followUs && canConnect ? (
+              {/* Accordion content */}
+              {(!isLinked || isExpanded) && (
+                <div className="mt-4 flex w-full flex-col gap-3 border-t border-ink-100 pt-3 dark:border-ink-800 animate-slide-down">
+                  {isLinked && (
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                      <p className="text-[10px] font-semibold text-ink-400 text-left uppercase tracking-wider">
+                        Bağlı Hesaplar
+                      </p>
+                      {platformAccounts.map((acc) => (
+                        <div key={acc.id} className="flex items-center gap-2.5 bg-ink-50/70 p-2 rounded-xl border border-ink-100 dark:bg-ink-900/60 dark:border-ink-800 text-left">
+                          {acc.profilePicUrl ? (
+                            <img src={acc.profilePicUrl} className="h-8 w-8 rounded-full border border-ink-200 dark:border-ink-700 object-cover" alt="" />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-xs uppercase">
+                              {acc.accountName.slice(0, 2)}
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-ink-900 dark:text-white truncate">{acc.accountName}</span>
+                            <span className="text-[9px] text-ink-400 font-mono truncate">ID: {acc.providerAccountId}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    {p.soon || atLimit ? (
+                      <span className="text-sm font-medium text-ink-300">
+                        {p.soon ? "Yakında" : "Limit dolu"}
+                      </span>
+                    ) : !canConnect ? (
+                      <Link
+                        href={`/accounts/setup?provider=${p.id.toLowerCase()}`}
+                        className="rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-sm font-semibold text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:border-ink-800 dark:text-ink-300"
+                      >
+                        API kur
+                      </Link>
+                    ) : (
+                      p.actions.map((a) => {
+                        const href = p.followUs && !followUs ? `${a.href}&follow=0` : a.href;
+                        return (
+                          <a
+                            key={a.label}
+                            href={href}
+                            className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+                          >
+                            {a.label}
+                          </a>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {p.followUs && canConnect && (!isLinked || isExpanded) ? (
                 <label className="mt-3 flex items-center gap-2 text-xs text-ink-500">
                   <input
                     type="checkbox"

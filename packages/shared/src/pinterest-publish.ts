@@ -46,17 +46,27 @@ export async function publishPinterestPin(params: {
     };
   }
 
-  const lines = params.content
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const title = (lines[0] || "SocialMarka").slice(0, 100);
-  const description = params.content.slice(0, 500);
+  let title = "SocialMarka";
+  const titleMatch = params.content.match(/^Başlık:\s*(.+)$/mi);
+  if (titleMatch) {
+    title = titleMatch[1].trim();
+  } else {
+    const lines = params.content.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines[0]) title = lines[0];
+  }
+  title = title.slice(0, 100);
 
-  // Optional link from content: [Link]: https://...
   let link: string | undefined;
-  const linkMatch = params.content.match(/\[Link\]:\s*(\S+)/i);
-  if (linkMatch) link = linkMatch[1];
+  const linkMatch = params.content.match(/^(?:Link|\[Link\]):\s*(\S+)/mi);
+  if (linkMatch) link = linkMatch[1].trim();
+
+  let description = params.content
+    .replace(/^Başlık:\s*.+$/gim, "")
+    .replace(/^(?:Link|\[Link\]):\s*.+$/gim, "")
+    .replace(/^Alt text:\s*.+$/gim, "")
+    .replace(/^\[Hashtags\]:\s*.+$/gim, "")
+    .trim();
+  description = description.slice(0, 500);
 
   const body: Record<string, unknown> = {
     board_id: boardId,

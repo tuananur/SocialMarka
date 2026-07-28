@@ -107,18 +107,30 @@ export function PostManageCard({
         </div>
       </button>
       {canEdit ? (
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 bg-[#fafbfc] px-4 py-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-ink-100 bg-[#fafbfc] px-4 py-2 dark:bg-ink-950 dark:border-ink-800">
           {onRestore ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRestore();
-              }}
-              className="rounded-lg px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
-            >
-              Geri Yükle
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestore();
+                }}
+                className="rounded-lg px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
+              >
+                Geri Yükle
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="rounded-lg px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+              >
+                Kalıcı Olarak Sil
+              </button>
+            </div>
           ) : (
             <>
               {showRetry ? (

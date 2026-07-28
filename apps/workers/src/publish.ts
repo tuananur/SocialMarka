@@ -11,10 +11,21 @@ import {
   encryptToken,
   getPlatformAdapter,
   resolveAccessToken,
+  postFirstComment,
+  type PlatformType,
   type PublishMediaFile,
 } from "@socialmarka/shared";
 
 console.log("[worker-publish] başlatılıyor...");
+
+function extractFirstComment(content: string): { caption: string; firstComment: string | null } {
+  const m = content.match(/\n*\s*\[İlk yorum\]:\s*([\s\S]+)$/i);
+  if (!m) return { caption: content, firstComment: null };
+  return {
+    caption: content.replace(/\n*\s*\[İlk yorum\]:\s*([\s\S]+)$/i, "").trim(),
+    firstComment: m[1].trim() || null,
+  };
+}
 
 const worker = new Worker<PublishJobData>(
   QUEUE_NAMES.PUBLISH,
@@ -120,7 +131,9 @@ const worker = new Worker<PublishJobData>(
     }
 
     const adapter = getPlatformAdapter(account.provider);
-    const content = target.platformContent || target.post.content;
+    const rawContent = target.platformContent || target.post.content;
+    const { caption, firstComment } = extractFirstComment(rawContent);
+    const content = caption;
     const mediaUrls = target.post.media.map((m) => m.originalUrl);
     const mediaFiles: PublishMediaFile[] = [];
 
@@ -159,13 +172,31 @@ const worker = new Worker<PublishJobData>(
     });
 
     if (result.success) {
+      let errorNote: string | null = null;
+      if (firstComment && result.remotePostId) {
+        try {
+          const commentResult = await postFirstComment({
+            platform: account.provider as PlatformType,
+            accessToken,
+            providerAccountId: account.providerAccountId,
+            remotePostId: result.remotePostId,
+            comment: firstComment,
+          });
+          if (!commentResult.success) {
+            errorNote = `Yayınlandı; ilk yorum: ${commentResult.errorMessage || "başarısız"}`;
+          }
+        } catch (e) {
+          errorNote = `Yayınlandı; ilk yorum: ${e instanceof Error ? e.message : "hata"}`;
+        }
+      }
+
       await prisma.postTarget.update({
         where: { id: postTargetId },
         data: {
           status: TargetStatus.PUBLISHED,
           publishedAt: new Date(),
           remotePostId: result.remotePostId,
-          errorMessage: null,
+          errorMessage: errorNote,
         },
       });
       console.log(

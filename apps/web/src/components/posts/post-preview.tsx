@@ -7,34 +7,42 @@ export function PostPreview({
   text,
   mediaUrl,
   mediaMime,
+  format = "post",
 }: {
   platform: string;
   text: string;
   mediaUrl?: string | null;
   mediaMime?: string | null;
+  format?: string;
 }) {
   const p = platform.toUpperCase();
+  const f = format.toLowerCase();
+  const isVertical =
+    p === "TIKTOK" ||
+    f === "story" ||
+    f === "reel" ||
+    (p === "YOUTUBE" && f === "shorts");
 
   return (
     <div className="space-y-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
-        Canlı önizleme · {p}
+        Canlı önizleme · {p} ({f})
       </p>
-      {p === "X" && <XPreview text={text} mediaUrl={mediaUrl} mediaMime={mediaMime} />}
-      {(p === "INSTAGRAM" || p === "YOUTUBE" || p === "TIKTOK") && (
+      {isVertical && (
         <VerticalPreview platform={p} text={text} mediaUrl={mediaUrl} mediaMime={mediaMime} />
       )}
-      {(p === "LINKEDIN" || p === "FACEBOOK" || p === "PINTEREST" || p === "ORIGINAL") && (
+      {!isVertical && p === "X" && (
+        <XPreview text={text} mediaUrl={mediaUrl} mediaMime={mediaMime} />
+      )}
+      {!isVertical && p !== "X" && (
         <CardPreview
           platform={p === "ORIGINAL" ? "LINKEDIN" : p}
           text={text}
           mediaUrl={mediaUrl}
           mediaMime={mediaMime}
+          format={f}
         />
       )}
-      {!["X", "INSTAGRAM", "YOUTUBE", "TIKTOK", "LINKEDIN", "FACEBOOK", "PINTEREST", "ORIGINAL"].includes(
-        p
-      ) && <CardPreview platform={p} text={text} mediaUrl={mediaUrl} mediaMime={mediaMime} />}
     </div>
   );
 }
@@ -42,36 +50,43 @@ export function PostPreview({
 function MediaBlock({
   mediaUrl,
   mediaMime,
+  format = "post",
 }: {
   mediaUrl?: string | null;
   mediaMime?: string | null;
+  format?: string;
 }) {
   if (!mediaUrl) {
+    const aspectClass = format === "story" || format === "reel" ? "aspect-[9/16]" : "aspect-video";
     return (
-      <div className="aspect-video rounded-lg bg-gradient-to-br from-brand-100 to-brand-300" />
+      <div className={`${aspectClass} rounded-lg bg-gradient-to-br from-brand-100 to-brand-300`} />
     );
   }
   const isVideo =
     mediaMime?.startsWith("video/") ||
     /\.(mp4|webm|mov|m4v)(\?|$)/i.test(mediaUrl) ||
     (mediaUrl.includes("video") && !mediaUrl.startsWith("blob:"));
+  
+  const mediaClass = format === "post"
+    ? "aspect-square object-cover w-full rounded-lg bg-ink-50 dark:bg-ink-900"
+    : "max-h-80 w-full rounded-lg object-contain bg-ink-50 dark:bg-ink-900";
+
   if (isVideo) {
     return (
       <video
         src={mediaUrl}
-        className="max-h-80 w-full rounded-lg object-contain"
+        className={mediaClass}
         controls
         playsInline
         muted
       />
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return (
     <img
       src={mediaUrl}
       alt=""
-      className="max-h-80 w-full rounded-lg object-contain bg-ink-50"
+      className={mediaClass}
     />
   );
 }
@@ -158,16 +173,18 @@ function CardPreview({
   text,
   mediaUrl,
   mediaMime,
+  format = "post",
 }: {
   platform: string;
   text: string;
   mediaUrl?: string | null;
   mediaMime?: string | null;
+  format?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-ink-100 p-3">
-        <div className="h-9 w-9 rounded-full bg-brand-100" />
+    <div className="overflow-hidden rounded-xl border border-ink-200 bg-white shadow-sm dark:bg-ink-950 dark:border-ink-800">
+      <div className="flex items-center gap-2 border-b border-ink-100 p-3 dark:border-ink-800">
+        <div className="h-9 w-9 rounded-full bg-brand-100 dark:bg-ink-800" />
         <div>
           <div className="text-sm font-semibold">SocialMarka</div>
           <div className="text-[10px] text-ink-400">{platform}</div>
@@ -176,7 +193,7 @@ function CardPreview({
       <p className="whitespace-pre-wrap p-3 text-sm">{text || "Gönderi metni burada görünecek..."}</p>
       {mediaUrl ? (
         <div className="px-3 pb-3">
-          <MediaBlock mediaUrl={mediaUrl} mediaMime={mediaMime} />
+          <MediaBlock mediaUrl={mediaUrl} mediaMime={mediaMime} format={format} />
         </div>
       ) : null}
     </div>
