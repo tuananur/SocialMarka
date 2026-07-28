@@ -355,8 +355,8 @@ async function fetchAllPages(userToken: string, shortToken?: string): Promise<an
       console.error("[Facebook OAuth] Fetch /me/businesses error:", err.message || err);
     }
 
-    // 6. Direct page node fallback for target pages (Jaglion ID 102151459388246 & 431790324477711)
-    const targetPageIds = ["102151459388246", "431790324477711"];
+    // 6. Direct page node fallback for target pages (Jaglion, Beyin Atölyesi, Terapist)
+    const targetPageIds = ["102151459388246", "431790324477711", "677128712399382", "611185908753699"];
     for (const pageId of targetPageIds) {
       if (seenPageIds.has(pageId)) continue;
       try {
