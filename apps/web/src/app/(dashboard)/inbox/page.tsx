@@ -3,6 +3,7 @@ import { requireWorkspace } from "@/lib/rbac";
 import { prisma } from "@socialmarka/db";
 import { toClientJson } from "@/lib/serialize";
 import { PanelSkeleton } from "@/components/dashboard/panel-skeleton";
+import { getLiveActivities } from "@/lib/inbox-activities";
 
 const InboxClient = dynamic(
   () => import("@/components/inbox/inbox-client").then((m) => m.InboxClient),
@@ -52,5 +53,12 @@ export default async function InboxPage() {
     take: 50,
   });
 
-  return <InboxClient conversations={toClientJson(conversations)} />;
+  const activities = await getLiveActivities(workspaceId);
+
+  return (
+    <InboxClient
+      conversations={toClientJson(conversations)}
+      initialActivities={toClientJson(activities)}
+    />
+  );
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma, SenderType, AccountStatus, InboxType } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { resolveAccessToken, decryptToken, encryptToken, refreshGoogleAccessToken } from "@socialmarka/shared";
+import { getLiveActivities } from "@/lib/inbox-activities";
 
 export async function POST(_req: Request) {
   const ctx = await getWorkspaceContext();
@@ -636,5 +637,6 @@ export async function POST(_req: Request) {
     take: 50,
   });
 
-  return NextResponse.json({ conversations: updatedConversations, debugLogs });
+  const activities = await getLiveActivities(ctx.workspaceId);
+  return NextResponse.json({ conversations: updatedConversations, debugLogs, activities });
 }

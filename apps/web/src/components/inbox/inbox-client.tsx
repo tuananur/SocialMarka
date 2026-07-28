@@ -90,7 +90,13 @@ const INITIAL_ACTIVITIES: Activity[] = [
   }
 ];
 
-export function InboxClient({ conversations: initial }: { conversations: Conversation[] }) {
+export function InboxClient({
+  conversations: initial,
+  initialActivities,
+}: {
+  conversations: Conversation[];
+  initialActivities?: Activity[];
+}) {
   const [conversations, setConversations] = useState(initial);
   const [activeId, setActiveId] = useState(initial[0]?.id || null);
   const [reply, setReply] = useState("");
@@ -98,7 +104,7 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
   const [mainTab, setMainTab] = useState<"messages" | "activities">("messages");
   const [filter, setFilter] = useState<"ALL" | "COMMENT" | "DIRECT_MESSAGE" | "UNREAD">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [activities, setActivities] = useState<Activity[]>(INITIAL_ACTIVITIES);
+  const [activities, setActivities] = useState<Activity[]>(initialActivities && initialActivities.length > 0 ? initialActivities : INITIAL_ACTIVITIES);
   const [activityFilter, setActivityFilter] = useState<"ALL" | "LIKE" | "FOLLOW" | "REPOST" | "SAVE">("ALL");
 
   const filteredConversations = useMemo(() => {
@@ -187,6 +193,9 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
       const data = await res.json();
       if (data.debugLogs) {
         setDebugLogs(data.debugLogs);
+      }
+      if (data.activities) {
+        setActivities(data.activities);
       }
       if (res.ok && data.conversations) {
         setConversations(data.conversations);
