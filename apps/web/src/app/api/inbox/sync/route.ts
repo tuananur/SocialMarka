@@ -273,6 +273,142 @@ export async function POST(_req: Request) {
       } catch (err: any) {
         debugLogs.push(`[${account.accountName}] Genel hata: ${err?.message || err}`);
       }
+    } else if (account.provider === "YOUTUBE") {
+      try {
+        let accessToken = resolveAccessToken(account.encryptedAccessToken);
+
+        // Refresh Google OAuth token if expired
+        const expiresAt = account.tokenExpiresAt;
+        const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() + 60000 : true;
+        if (isExpired && account.encryptedRefreshToken) {
+          try {
+            const decryptedRefresh = decryptToken(account.encryptedRefreshToken);
+            const refreshed = await refreshGoogleAccessToken(decryptedRefresh);
+            accessToken = refreshed.accessToken;
+
+            await prisma.socialAccount.update({
+              where: { id: account.id },
+              data: {
+                encryptedAccessToken: encryptToken(refreshed.accessToken),
+                tokenExpiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
+                ...(refreshed.refreshToken ? { encryptedRefreshToken: encryptToken(refreshed.refreshToken) } : {}),
+              }
+            });
+            debugLogs.push(`[${account.accountName}] YouTube token yenilendi`);
+          } catch (refreshErr: any) {
+            debugLogs.push(`[${account.accountName}] YouTube token yenileme hatası: ${refreshErr?.message}`);
+          }
+        }
+
+        // 1. Fetch channel uploads playlist
+        const channelRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${encodeURIComponent(account.providerAccountId)}&access_token=${accessToken}`
+        );
+        if (!channelRes.ok) {
+          const err = await channelRes.json().catch(() => ({}));
+          debugLogs.push(`[${account.accountName}] YouTube kanal bilgisi çekilemedi: ${err.error?.message || channelRes.statusText}`);
+          continue;
+        }
+        const channelJson = await channelRes.json();
+        const uploadsPlaylistId = channelJson.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+        if (!uploadsPlaylistId) {
+          debugLogs.push(`[${account.accountName}] YouTube uploads playlist ID bulunamadı`);
+          continue;
+        }
+
+        // 2. Fetch latest videos from uploads playlist
+        const playlistRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=15&access_token=${accessToken}`
+        );
+        if (!playlistRes.ok) {
+          debugLogs.push(`[${account.accountName}] YouTube videoları çekilemedi`);
+          continue;
+        }
+        const playlistJson = await playlistRes.json();
+        const videoItems = playlistJson.items || [];
+        debugLogs.push(`[${account.accountName}] Kanaldan ${videoItems.length} güncel video bulundu`);
+
+        // 3. Loop over videos and fetch comments
+        for (const vItem of videoItems) {
+          const videoId = vItem.snippet?.resourceId?.videoId;
+          if (!videoId) continue;
+
+          const commentRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=100&access_token=${accessToken}`
+          );
+          if (!commentRes.ok) {
+            continue;
+          }
+          const commentJson = await commentRes.json();
+          const commentItems = commentJson.items || [];
+
+          if (commentItems.length > 0) {
+            debugLogs.push(`[${account.accountName}] Video ${videoId} için ${commentItems.length} yorum bulundu`);
+          }
+
+          for (const item of commentItems) {
+            const commentSnippet = item.snippet?.topLevelComment?.snippet;
+            if (!commentSnippet) continue;
+
+            const sender = commentSnippet.authorDisplayName || "youtube_user";
+            const commentText = commentSnippet.textOriginal || commentSnippet.textDisplay || "";
+            const senderAvatar = commentSnippet.authorProfileImageUrl || "";
+            const remoteId = item.snippet.topLevelComment.id;
+            const createdAt = commentSnippet.publishedAt ? new Date(commentSnippet.publishedAt) : new Date();
+
+            if (!commentText) continue;
+
+            let conversation = await prisma.inboxConversation.findFirst({
+              where: {
+                socialAccountId: account.id,
+                senderName: sender,
+                type: InboxType.COMMENT,
+              },
+            });
+
+            if (!conversation) {
+              conversation = await prisma.inboxConversation.create({
+                data: {
+                  workspaceId: ctx.workspaceId,
+                  socialAccountId: account.id,
+                  senderName: sender,
+                  senderAvatar,
+                  lastMessage: commentText,
+                  lastMessageAt: createdAt,
+                  type: InboxType.COMMENT,
+                  remoteId,
+                },
+              });
+            } else {
+              await prisma.inboxConversation.update({
+                where: { id: conversation.id },
+                data: {
+                  lastMessage: commentText,
+                  lastMessageAt: createdAt,
+                  senderAvatar,
+                  isRead: false,
+                },
+              });
+            }
+
+            const existingMsg = await prisma.inboxMessage.findFirst({
+              where: { conversationId: conversation.id, messageText: commentText },
+            });
+            if (!existingMsg) {
+              await prisma.inboxMessage.create({
+                data: {
+                  conversationId: conversation.id,
+                  senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                  messageText: commentText,
+                  createdAt,
+                },
+              });
+            }
+          }
+        }
+      } catch (ytErr: any) {
+        debugLogs.push(`[${account.accountName}] YouTube genel hata: ${ytErr?.message || ytErr}`);
+      }
     }
   }
 
