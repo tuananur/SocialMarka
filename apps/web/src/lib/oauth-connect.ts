@@ -124,9 +124,7 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
 
   // Konsolda kayıtlı URI — yeni /api/auth/*/callback ile uyum için aynı path
   const callbackUri = `${oauthOrigin}${oauthCallbackPath(platform)}`;
-  const hasCreds = platform === "INSTAGRAM"
-    ? hasPlatformOAuthCredentials("FACEBOOK")
-    : hasPlatformOAuthCredentials(platform);
+  const hasCreds = hasPlatformOAuthCredentials(platform);
   const allowSim =
     forceLocal ||
     !hasCreds ||
@@ -141,7 +139,6 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
       state,
       redirectUri: callbackUri,
       codeChallenge: pkce?.codeChallenge,
-      connectType,
     });
     if (authUrl) {
       // Guard: empty client_key produces TikTok "fix client_key" page
@@ -299,133 +296,122 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
     }
   }
 
-  // --- Sayfa seçim sihirbazı (Facebook/Instagram çoklu sayfa) ---
-  if (multipleAccounts && multipleAccounts.length > 0) {
-    const list = multipleAccounts.map((acc: any) => ({
-      accessToken: acc.accessToken,
-      refreshToken: acc.refreshToken || refreshToken,
-      expiresIn: acc.expiresIn || expiresIn,
-      providerAccountId: acc.providerAccountId,
-      accountName: acc.accountName,
-      profilePicUrl: acc.profilePicUrl,
-    }));
+  // Build the list of accounts to process
+  const accountsToSave = multipleAccounts && multipleAccounts.length > 0
+    ? multipleAccounts.map((acc: any) => ({
+        accessToken: acc.accessToken,
+        refreshToken: acc.refreshToken || refreshToken,
+        expiresIn: acc.expiresIn || expiresIn,
+        providerAccountId: acc.providerAccountId,
+        accountName: acc.accountName,
+        profilePicUrl: acc.profilePicUrl,
+      }))
+    : [{
+        accessToken,
+        refreshToken,
+        expiresIn,
+        providerAccountId,
+        accountName,
+        profilePicUrl,
+      }];
 
-    const cookieVal = Buffer.from(JSON.stringify({
-      list,
-      workspaceId: parsed.workspaceId,
-      userId: parsed.userId,
-      connectGroupId,
-      isPlatformApp,
-      connectType: parsed.connectType,
-    })).toString("base64");
+  let firstAccountId = "";
+  let firstAccountName = "";
 
-    const response = NextResponse.redirect(new URL(`/accounts/select?provider=${provider}`, origin));
-    response.cookies.set("sm_temp_import_pages", cookieVal, {
-      maxAge: 900,
-      path: "/",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-    });
-    return response;
-  }
-
-  // --- Tek hesap doğrudan kaydet ---
-  const item = {
-    accessToken,
-    refreshToken,
-    expiresIn,
-    providerAccountId,
-    accountName,
-    profilePicUrl,
-  };
-
-  const existing = await prisma.socialAccount.findFirst({
-    where: {
-      workspaceId: parsed.workspaceId,
-      provider,
-      providerAccountId: item.providerAccountId,
-    },
-  });
-
-  if (!existing) {
-    const limit = getAccountLimit();
-    const accountCount = await prisma.socialAccount.count({
-      where: { workspaceId: parsed.workspaceId, status: { not: "DISCONNECTED" } },
-    });
-    if (accountCount >= limit) {
-      return NextResponse.redirect(new URL("/accounts/create?error=limit", origin));
-    }
-  }
-
-  let encryptedAccessToken: string | null = null;
-  let encryptedRefreshToken: string | null = null;
-  try {
-    encryptedAccessToken = encryptToken(item.accessToken);
-    if (item.refreshToken) encryptedRefreshToken = encryptToken(item.refreshToken);
-  } catch {
-    encryptedAccessToken = item.accessToken;
-    encryptedRefreshToken = item.refreshToken || null;
-  }
-
-  const expiresAt = item.expiresIn
-    ? new Date(Date.now() + item.expiresIn * 1000)
-    : new Date(Date.now() + 90 * 24 * 3600_000);
-
-  let accountId: string;
-
-  if (existing) {
-    const updated = await prisma.socialAccount.update({
-      where: { id: existing.id },
-      data: {
-        accountName: item.accountName.slice(0, 120),
-        profilePicUrl: item.profilePicUrl || existing.profilePicUrl,
-        status: AccountStatus.CONNECTED,
-        lastConnectedBy: user?.name || user?.email || "Kullanıcı",
-        encryptedAccessToken,
-        encryptedRefreshToken,
-        tokenExpiresAt: expiresAt,
-        ...(connectGroupId ? { groups: { connect: [{ id: connectGroupId }] } } : {}),
-      },
-    });
-    accountId = updated.id;
-  } else {
-    const created = await prisma.socialAccount.create({
-      data: {
+  for (const item of accountsToSave) {
+    const existing = await prisma.socialAccount.findFirst({
+      where: {
+        workspaceId: parsed.workspaceId,
         provider,
         providerAccountId: item.providerAccountId,
-        accountName: item.accountName.slice(0, 120),
-        profilePicUrl: item.profilePicUrl || null,
-        status: AccountStatus.CONNECTED,
-        lastConnectedBy: user?.name || user?.email || "Kullanıcı",
-        encryptedAccessToken,
-        encryptedRefreshToken,
-        tokenExpiresAt: expiresAt,
-        workspaceId: parsed.workspaceId,
-        ...(connectGroupId ? { groups: { connect: [{ id: connectGroupId }] } } : {}),
       },
     });
-    accountId = created.id;
-  }
 
-  await prisma.auditLog.create({
-    data: {
-      action: "ACCOUNT_CONNECTED",
-      details: {
-        provider,
-        connectType: parsed.connectType,
-        via: isPlatformApp ? "oauth" : "connect",
-        accountName: item.accountName,
-        accountId,
-        groupId: connectGroupId,
+    if (!existing) {
+      const limit = getAccountLimit();
+      const accountCount = await prisma.socialAccount.count({
+        where: { workspaceId: parsed.workspaceId, status: { not: "DISCONNECTED" } },
+      });
+      if (accountCount >= limit) {
+        return NextResponse.redirect(new URL("/accounts/create?error=limit", origin));
+      }
+    }
+
+    let encryptedAccessToken: string | null = null;
+    let encryptedRefreshToken: string | null = null;
+    try {
+      encryptedAccessToken = encryptToken(item.accessToken);
+      if (item.refreshToken) encryptedRefreshToken = encryptToken(item.refreshToken);
+    } catch {
+      encryptedAccessToken = item.accessToken;
+      encryptedRefreshToken = item.refreshToken || null;
+    }
+
+    const expiresAt = item.expiresIn
+      ? new Date(Date.now() + item.expiresIn * 1000)
+      : new Date(Date.now() + 90 * 24 * 3600_000);
+
+    let accountId: string;
+
+    if (existing) {
+      const updated = await prisma.socialAccount.update({
+        where: { id: existing.id },
+        data: {
+          accountName: item.accountName.slice(0, 120),
+          profilePicUrl: item.profilePicUrl || existing.profilePicUrl,
+          status: AccountStatus.CONNECTED,
+          lastConnectedBy: user?.name || user?.email || "Kullanıcı",
+          encryptedAccessToken,
+          encryptedRefreshToken,
+          tokenExpiresAt: expiresAt,
+          ...(connectGroupId ? { groups: { connect: [{ id: connectGroupId }] } } : {}),
+        },
+      });
+      accountId = updated.id;
+    } else {
+      const created = await prisma.socialAccount.create({
+        data: {
+          provider,
+          providerAccountId: item.providerAccountId,
+          accountName: item.accountName.slice(0, 120),
+          profilePicUrl: item.profilePicUrl || null,
+          status: AccountStatus.CONNECTED,
+          lastConnectedBy: user?.name || user?.email || "Kullanıcı",
+          encryptedAccessToken,
+          encryptedRefreshToken,
+          tokenExpiresAt: expiresAt,
+          workspaceId: parsed.workspaceId,
+          ...(connectGroupId ? { groups: { connect: [{ id: connectGroupId }] } } : {}),
+        },
+      });
+      accountId = created.id;
+    }
+
+    if (!firstAccountId) {
+      firstAccountId = accountId;
+      firstAccountName = item.accountName;
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        action: "ACCOUNT_CONNECTED",
+        details: {
+          provider,
+          connectType: parsed.connectType,
+          via: isPlatformApp ? "oauth" : "connect",
+          accountName: item.accountName,
+          accountId,
+          groupId: connectGroupId,
+        },
+        userId: parsed.userId,
+        workspaceId: parsed.workspaceId,
       },
-      userId: parsed.userId,
-      workspaceId: parsed.workspaceId,
-    },
-  });
+    });
+  }
 
   const done = new URL("/accounts", origin);
   done.searchParams.set("status", "success");
   done.searchParams.set("provider", provider);
-  done.searchParams.set("name", item.accountName);
+  done.searchParams.set("name", firstAccountName || accountName);
   return NextResponse.redirect(done);
 }

@@ -89,44 +89,40 @@ export function buildPlatformAuthorizeUrl(opts: {
   state: string;
   redirectUri: string;
   codeChallenge?: string;
-  connectType?: string;
 }): string | null {
-  const { provider, state, redirectUri, codeChallenge, connectType } = opts;
+  const { provider, state, redirectUri, codeChallenge } = opts;
   const enc = encodeURIComponent;
   const creds = getPlatformCreds(provider);
-  if (!creds && provider !== "INSTAGRAM") return null;
+  if (!creds) return null;
 
   switch (provider) {
     case "FACEBOOK": {
-      const scope = "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management,pages_messaging,instagram_basic,instagram_manage_comments,instagram_manage_messages";
-      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
+      const scope = "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management";
+      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "INSTAGRAM": {
-      // Her iki tip de (personal + business) Facebook OAuth dialog ile bağlanır.
-      // Bu ekran kullanıcıya hangi sayfaları paylaşacağını seçme imkânı verir.
-      const fbCreds = getPlatformCreds("FACEBOOK");
-      if (!fbCreds) return null;
-      const scope = "public_profile,pages_show_list,pages_read_engagement,business_management,instagram_basic,instagram_manage_comments,instagram_manage_messages,instagram_content_publish";
-      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(fbCreds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
+      // Trigger rebuild to inject INSTAGRAM_APP_ID environment variable
+      const scope = "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments";
+      return `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "LINKEDIN": {
-      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc("openid profile email w_member_social")}`;
+      return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc("openid profile email w_member_social")}`;
     }
     case "YOUTUBE": {
-      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile")}&access_type=offline&prompt=consent&state=${enc(state)}`;
+      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile")}&access_type=offline&prompt=consent&state=${enc(state)}`;
     }
     case "X": {
       if (!codeChallenge) return null;
-      return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&scope=${enc("tweet.read tweet.write users.read offline.access")}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
+      return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&scope=${enc("tweet.read tweet.write users.read offline.access")}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "TIKTOK": {
       if (!codeChallenge) return null;
       // Login + Content Posting (upload to drafts)
       const scope = "user.info.basic,video.upload";
-      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds!.clientId)}&response_type=code&scope=${enc(scope)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
+      return `https://www.tiktok.com/v2/auth/authorize/?client_key=${enc(creds.clientId)}&response_type=code&scope=${enc(scope)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&code_challenge=${enc(codeChallenge)}&code_challenge_method=S256`;
     }
     case "PINTEREST": {
-      return `https://www.pinterest.com/oauth/?client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("boards:read,pins:read,pins:write,user_accounts:read")}&state=${enc(state)}`;
+      return `https://www.pinterest.com/oauth/?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("boards:read,pins:read,pins:write,user_accounts:read")}&state=${enc(state)}`;
     }
     default:
       return null;
@@ -165,8 +161,7 @@ export async function exchangeOAuthCode(opts: {
     case "FACEBOOK":
       return exchangeFacebook(code, redirectUri, connectType === "page", false);
     case "INSTAGRAM":
-      // Hem personal hem business → Facebook Graph API üzerinden exchange
-      return exchangeFacebook(code, redirectUri, true, true);
+      return exchangeInstagram(code, redirectUri);
     case "YOUTUBE":
       return exchangeYouTube(code, redirectUri);
     case "X":
