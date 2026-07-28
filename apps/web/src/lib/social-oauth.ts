@@ -102,17 +102,12 @@ export function buildPlatformAuthorizeUrl(opts: {
       return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "INSTAGRAM": {
-      if (connectType === "business") {
-        // Instagram Business is managed via Facebook login flow
-        const fbCreds = getPlatformCreds("FACEBOOK");
-        if (!fbCreds) return null;
-        const scope = "public_profile,pages_show_list,pages_read_engagement,business_management,instagram_basic,instagram_manage_comments,instagram_manage_messages";
-        return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(fbCreds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
-      }
-      // Instagram Personal uses Instagram consumer login
-      if (!creds) return null;
-      const scope = "user_profile,user_media";
-      return `https://api.instagram.com/oauth/authorize?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
+      // Her iki tip de (personal + business) Facebook OAuth dialog ile bağlanır.
+      // Bu ekran kullanıcıya hangi sayfaları paylaşacağını seçme imkânı verir.
+      const fbCreds = getPlatformCreds("FACEBOOK");
+      if (!fbCreds) return null;
+      const scope = "public_profile,pages_show_list,pages_read_engagement,business_management,instagram_basic,instagram_manage_comments,instagram_manage_messages,instagram_content_publish";
+      return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(fbCreds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "LINKEDIN": {
       return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${enc(creds!.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc("openid profile email w_member_social")}`;
@@ -170,10 +165,8 @@ export async function exchangeOAuthCode(opts: {
     case "FACEBOOK":
       return exchangeFacebook(code, redirectUri, connectType === "page", false);
     case "INSTAGRAM":
-      if (connectType === "business") {
-        return exchangeFacebook(code, redirectUri, true, true);
-      }
-      return exchangeInstagram(code, redirectUri);
+      // Hem personal hem business → Facebook Graph API üzerinden exchange
+      return exchangeFacebook(code, redirectUri, true, true);
     case "YOUTUBE":
       return exchangeYouTube(code, redirectUri);
     case "X":
