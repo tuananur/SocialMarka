@@ -139,6 +139,7 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
       state,
       redirectUri: callbackUri,
       codeChallenge: pkce?.codeChallenge,
+      connectType,
     });
     if (authUrl) {
       // Guard: empty client_key produces TikTok "fix client_key" page
