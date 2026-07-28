@@ -129,6 +129,8 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, firstAccountName });
   } catch (err: any) {
     console.error("[IMPORT SELECTED ERROR]:", err);
-    return Response.json({ error: err?.message || "Sunucu hatası" }, { status: 500 });
+    return Response.json({ 
+      error: `Hata oluştu: ${err?.message || "Bilinmeyen hata"}` 
+    }, { status: 500 });
   }
 }
