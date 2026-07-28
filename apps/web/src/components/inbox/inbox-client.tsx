@@ -218,19 +218,22 @@ export function InboxClient({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleDeleteConversation(id: string) {
-    if (!confirm("Bu konuşmayı gelen kutusundan silmek istediğinize emin misiniz?")) return;
+    if (!confirm("Bu konuşmayı ve varsa yorumu canlı sosyal medyadan silmek istediğinize emin misiniz?")) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/inbox/conversations/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         const remaining = conversations.filter((c) => c.id !== id);
         setConversations(remaining);
         if (activeId === id) {
           setActiveId(remaining[0]?.id || null);
         }
+      } else {
+        alert(data.error || "Silme işlemi sırasında bir hata oluştu.");
       }
-    } catch (err) {
-      console.error("[InboxClient] Delete conversation error:", err);
+    } catch (err: any) {
+      alert(err?.message || "Silme hatası oluştu.");
     } finally {
       setDeletingId(null);
     }

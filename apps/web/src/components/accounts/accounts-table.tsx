@@ -110,10 +110,15 @@ export function AccountsTable({
     setBusy(true);
     try {
       const res = await fetch(`/api/accounts/${disconnectId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setAccounts((prev) => prev.filter((a) => a.id !== disconnectId));
         setSelected((prev) => prev.filter((id) => id !== disconnectId));
+      } else {
+        alert(data.error || "Hesap bağlantısı kesilirken bir hata oluştu.");
       }
+    } catch (err: any) {
+      alert(err?.message || "Hesap silme hatası oluştu.");
     } finally {
       setBusy(false);
       setDisconnectId(null);
