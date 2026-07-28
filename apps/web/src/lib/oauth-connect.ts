@@ -124,7 +124,9 @@ export async function handleOAuthConnect(req: Request, providerRaw: string) {
 
   // Konsolda kayıtlı URI — yeni /api/auth/*/callback ile uyum için aynı path
   const callbackUri = `${oauthOrigin}${oauthCallbackPath(platform)}`;
-  const hasCreds = hasPlatformOAuthCredentials(platform);
+  const hasCreds = (platform === "INSTAGRAM" && connectType === "business")
+    ? hasPlatformOAuthCredentials("FACEBOOK")
+    : hasPlatformOAuthCredentials(platform);
   const allowSim =
     forceLocal ||
     !hasCreds ||
