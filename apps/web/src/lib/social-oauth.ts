@@ -97,7 +97,7 @@ export function buildPlatformAuthorizeUrl(opts: {
 
   switch (provider) {
     case "FACEBOOK": {
-      const scope = "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management,pages_messaging,pages_read_user_content,instagram_basic,instagram_manage_comments,instagram_manage_messages";
+      const scope = "public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management,pages_messaging,instagram_basic,instagram_manage_comments,instagram_manage_messages";
       return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc(scope)}&response_type=code`;
     }
     case "INSTAGRAM": {
