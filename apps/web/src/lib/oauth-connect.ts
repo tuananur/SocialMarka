@@ -296,19 +296,64 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
     }
   }
 
-  // Çoklu sayfa varsa (Facebook/Instagram) → kullanıcı seçsin
+  // Çoklu sayfa varsa (Facebook/Instagram) → veritabanına DISCONNECTED olarak kaydet, çerezde sadece meta bilgi tut
   if (multipleAccounts && multipleAccounts.length > 0) {
-    const list = multipleAccounts.map((acc: any) => ({
-      refreshToken: acc.refreshToken || refreshToken,
-      expiresIn: acc.expiresIn || expiresIn,
-      providerAccountId: acc.providerAccountId,
-      accountName: acc.accountName,
-      profilePicUrl: acc.profilePicUrl,
-    }));
+    for (const acc of multipleAccounts) {
+      const existing = await prisma.socialAccount.findFirst({
+        where: {
+          workspaceId: parsed.workspaceId,
+          provider,
+          providerAccountId: acc.providerAccountId,
+        },
+      });
+
+      let encryptedAccessToken: string | null = null;
+      let encryptedRefreshToken: string | null = null;
+      try {
+        encryptedAccessToken = encryptToken(acc.accessToken);
+        if (acc.refreshToken) encryptedRefreshToken = encryptToken(acc.refreshToken);
+      } catch {
+        encryptedAccessToken = acc.accessToken;
+        encryptedRefreshToken = acc.refreshToken || null;
+      }
+
+      const expiresAt = acc.expiresIn
+        ? new Date(Date.now() + acc.expiresIn * 1000)
+        : new Date(Date.now() + 90 * 24 * 3600_000);
+
+      if (existing) {
+        await prisma.socialAccount.update({
+          where: { id: existing.id },
+          data: {
+            accountName: acc.accountName.slice(0, 120),
+            profilePicUrl: acc.profilePicUrl || existing.profilePicUrl,
+            encryptedAccessToken,
+            encryptedRefreshToken,
+            tokenExpiresAt: expiresAt,
+            lastConnectedBy: user?.name || user?.email || "Kullanıcı",
+            // status is kept as is (either CONNECTED or DISCONNECTED)
+          },
+        });
+      } else {
+        await prisma.socialAccount.create({
+          data: {
+            provider,
+            providerAccountId: acc.providerAccountId,
+            accountName: acc.accountName.slice(0, 120),
+            profilePicUrl: acc.profilePicUrl || null,
+            status: AccountStatus.DISCONNECTED, // Default to disconnected until user selects it
+            lastConnectedBy: user?.name || user?.email || "Kullanıcı",
+            encryptedAccessToken,
+            encryptedRefreshToken,
+            tokenExpiresAt: expiresAt,
+            workspaceId: parsed.workspaceId,
+            ...(connectGroupId ? { groups: { connect: [{ id: connectGroupId }] } } : {}),
+          },
+        });
+      }
+    }
 
     const cookieVal = Buffer.from(JSON.stringify({
-      list,
-      userToken: accessToken, // Store the main user token here so we can fetch page tokens on the fly
       workspaceId: parsed.workspaceId,
       userId: parsed.userId,
       connectGroupId,
@@ -317,7 +362,7 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
     })).toString("base64");
 
     const response = NextResponse.redirect(new URL(`/accounts/select?provider=${provider}`, origin));
-    response.cookies.set("sm_temp_import_pages", cookieVal, {
+    response.cookies.set("sm_temp_import_meta", cookieVal, {
       maxAge: 900, // 15 dakika
       path: "/",
       httpOnly: true,

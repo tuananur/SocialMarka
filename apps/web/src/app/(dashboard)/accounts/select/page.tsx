@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireWorkspace } from "@/lib/rbac";
 import { SelectAccountsClient } from "./select-client";
+import { prisma } from "@socialmarka/db";
 
 export default async function AccountsSelectPage(props: {
   searchParams: Promise<{ provider?: string }>;
@@ -10,7 +11,7 @@ export default async function AccountsSelectPage(props: {
   await requireWorkspace();
 
   const cookieStore = await cookies();
-  const rawCookie = cookieStore.get("sm_temp_import_pages")?.value;
+  const rawCookie = cookieStore.get("sm_temp_import_meta")?.value;
 
   if (!rawCookie) {
     redirect("/accounts");
@@ -24,13 +25,42 @@ export default async function AccountsSelectPage(props: {
     redirect("/accounts");
   }
 
-  if (!data || !data.list || data.list.length === 0) {
+  if (!data || !data.workspaceId) {
     redirect("/accounts");
   }
 
+  const dbProvider = provider?.toUpperCase() === "INSTAGRAM" ? "INSTAGRAM" : "FACEBOOK";
+
+  // Query DISCONNECTED accounts for this provider in the workspace
+  const disconnectedAccounts = await prisma.socialAccount.findMany({
+    where: {
+      workspaceId: data.workspaceId,
+      provider: dbProvider,
+      status: "DISCONNECTED",
+    },
+    select: {
+      providerAccountId: true,
+      accountName: true,
+      profilePicUrl: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  if (disconnectedAccounts.length === 0) {
+    redirect("/accounts");
+  }
+
+  const list = disconnectedAccounts.map((acc) => ({
+    providerAccountId: acc.providerAccountId,
+    accountName: acc.accountName,
+    profilePicUrl: acc.profilePicUrl || undefined,
+  }));
+
   return (
     <SelectAccountsClient
-      list={data.list}
+      list={list}
       provider={provider || "FACEBOOK"}
     />
   );

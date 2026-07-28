@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     const cookieStore = await cookies();
-    const rawCookie = cookieStore.get("sm_temp_import_pages")?.value;
+    const rawCookie = cookieStore.get("sm_temp_import_meta")?.value;
     if (!rawCookie) {
       return Response.json({ error: "Bağlantı oturumu bulunamadı veya süresi doldu." }, { status: 400 });
     }
@@ -29,109 +29,38 @@ export async function POST(req: Request) {
       return Response.json({ error: "Geçersiz veri formatı." }, { status: 400 });
     }
 
-    if (!data || !data.list || data.list.length === 0) {
-      return Response.json({ error: "Listeniz boş." }, { status: 400 });
-    }
-
-    const toImport = data.list.filter((x: any) => selectedIds.includes(x.providerAccountId));
-    if (toImport.length === 0) {
-      return Response.json({ error: "Seçilen hesaplar listede bulunamadı." }, { status: 400 });
+    if (!data || !data.workspaceId) {
+      return Response.json({ error: "Eksik oturum verisi." }, { status: 400 });
     }
 
     // Determine provider: if connectType is business, it's INSTAGRAM, otherwise FACEBOOK
     const provider = data.connectType === "business" ? "INSTAGRAM" : "FACEBOOK";
 
-    // Fetch page access tokens from Graph API using the userToken once
-    const pagesWithTokens: any[] = [];
-    if (data.userToken) {
-      try {
-        const tokenRes = await fetch(
-          `https://graph.facebook.com/v19.0/me/accounts?fields=id,access_token,instagram_business_account{id}&limit=100&access_token=${encodeURIComponent(data.userToken)}`
-        );
-        if (tokenRes.ok) {
-          const tokenJson = await tokenRes.json();
-          if (Array.isArray(tokenJson.data)) {
-            pagesWithTokens.push(...tokenJson.data);
-          }
-        }
-      } catch (tokenErr) {
-        console.error("[Token exchange error]", tokenErr);
-      }
+    // Query the selected disconnected accounts from the DB
+    const toImport = await prisma.socialAccount.findMany({
+      where: {
+        workspaceId: data.workspaceId,
+        provider,
+        providerAccountId: { in: selectedIds },
+        status: "DISCONNECTED",
+      },
+    });
+
+    if (toImport.length === 0) {
+      return Response.json({ error: "Seçilen hesaplar veritabanında bulunamadı veya zaten bağlı." }, { status: 400 });
     }
 
     let firstAccountName = "";
 
     for (const item of toImport) {
-      // Find the specific page access token
-      let pageAccessToken = "";
-      if (provider === "FACEBOOK") {
-        const match = pagesWithTokens.find((p: any) => p.id === item.providerAccountId);
-        pageAccessToken = match?.access_token || "";
-      } else if (provider === "INSTAGRAM") {
-        const match = pagesWithTokens.find((p: any) => p.instagram_business_account?.id === item.providerAccountId);
-        pageAccessToken = match?.access_token || "";
-      }
-
-      // Fallback to userToken if page-specific token is missing
-      const tokenToSave = pageAccessToken || data.userToken || "";
-
-      const existing = await prisma.socialAccount.findFirst({
-        where: {
-          workspaceId: data.workspaceId,
-          provider,
-          providerAccountId: item.providerAccountId,
+      const updated = await prisma.socialAccount.update({
+        where: { id: item.id },
+        data: {
+          status: AccountStatus.CONNECTED,
+          lastConnectedBy: session.user.name || session.user.email || "Kullanıcı",
+          ...(data.connectGroupId ? { groups: { connect: [{ id: data.connectGroupId }] } } : {}),
         },
       });
-
-      let encryptedAccessToken: string | null = null;
-      let encryptedRefreshToken: string | null = null;
-      try {
-        encryptedAccessToken = encryptToken(tokenToSave);
-        if (item.refreshToken) encryptedRefreshToken = encryptToken(item.refreshToken);
-      } catch {
-        encryptedAccessToken = tokenToSave;
-        encryptedRefreshToken = item.refreshToken || null;
-      }
-
-      const expiresAt = item.expiresIn
-        ? new Date(Date.now() + item.expiresIn * 1000)
-        : new Date(Date.now() + 90 * 24 * 3600_000);
-
-      let accountId: string;
-
-      if (existing) {
-        const updated = await prisma.socialAccount.update({
-          where: { id: existing.id },
-          data: {
-            accountName: item.accountName.slice(0, 120),
-            profilePicUrl: item.profilePicUrl || existing.profilePicUrl,
-            status: AccountStatus.CONNECTED,
-            lastConnectedBy: session.user.name || session.user.email || "Kullanıcı",
-            encryptedAccessToken,
-            encryptedRefreshToken,
-            tokenExpiresAt: expiresAt,
-            ...(data.connectGroupId ? { groups: { connect: [{ id: data.connectGroupId }] } } : {}),
-          },
-        });
-        accountId = updated.id;
-      } else {
-        const created = await prisma.socialAccount.create({
-          data: {
-            provider,
-            providerAccountId: item.providerAccountId,
-            accountName: item.accountName.slice(0, 120),
-            profilePicUrl: item.profilePicUrl || null,
-            status: AccountStatus.CONNECTED,
-            lastConnectedBy: session.user.name || session.user.email || "Kullanıcı",
-            encryptedAccessToken,
-            encryptedRefreshToken,
-            tokenExpiresAt: expiresAt,
-            workspaceId: data.workspaceId,
-            ...(data.connectGroupId ? { groups: { connect: [{ id: data.connectGroupId }] } } : {}),
-          },
-        });
-        accountId = created.id;
-      }
 
       if (!firstAccountName) {
         firstAccountName = item.accountName;
@@ -145,7 +74,7 @@ export async function POST(req: Request) {
             connectType: data.connectType,
             via: data.isPlatformApp ? "oauth" : "connect",
             accountName: item.accountName,
-            accountId,
+            accountId: item.id,
             groupId: data.connectGroupId,
           },
           userId: data.userId,
@@ -154,8 +83,18 @@ export async function POST(req: Request) {
       });
     }
 
+    // Clean up unselected disconnected accounts of this provider to prevent cluttering
+    await prisma.socialAccount.deleteMany({
+      where: {
+        workspaceId: data.workspaceId,
+        provider,
+        status: "DISCONNECTED",
+        providerAccountId: { notIn: selectedIds },
+      },
+    });
+
     // Clear temp cookie
-    cookieStore.delete("sm_temp_import_pages");
+    cookieStore.delete("sm_temp_import_meta");
 
     return Response.json({ ok: true, firstAccountName });
   } catch (err: any) {
