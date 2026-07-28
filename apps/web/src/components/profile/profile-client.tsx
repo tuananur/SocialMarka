@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
+import { ActionModal } from "@/components/ui/action-modal";
 type ProfileClientProps = {
   user: {
     id: string;
@@ -148,21 +148,26 @@ export function ProfileClient({ user }: ProfileClientProps) {
 
       {/* Geri Bildirim Mesajları */}
       {successMsg && (
-        <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 text-sm font-semibold text-green-700 animate-fade-in flex items-center gap-2">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 text-sm font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-400 animate-fade-in flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
           </svg>
           {successMsg}
         </div>
       )}
-      {errorMsg && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 text-sm font-semibold text-rose-700 animate-fade-in flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-          </svg>
-          {errorMsg}
-        </div>
-      )}
+
+      <ActionModal 
+        config={{
+          isOpen: !!errorMsg,
+          title: "İşlem Başarısız",
+          description: errorMsg,
+          type: "error",
+          confirmText: "Anladım"
+        }}
+        setConfig={(c) => {
+          if (!c.isOpen) setErrorMsg("");
+        }}
+      />
 
       <div className="grid gap-8 lg:grid-cols-12">
         {/* Sol Sütun: Profil & Şifre Düzenleme Formu */}

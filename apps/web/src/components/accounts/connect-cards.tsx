@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ProviderIcon } from "@/components/posts/provider-icon";
+import { ActionModal } from "@/components/ui/action-modal";
 
 type ConnectAction = {
   label: string;
@@ -153,6 +154,16 @@ export function ConnectPlatformCards({
   const [followUs, setFollowUs] = useState(true);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
+  const router = useRouter();
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(!!(error && ERROR_MSG[error]));
+
+  // Eğer url'de error değişirse modalı aç
+  useEffect(() => {
+    if (error && ERROR_MSG[error]) {
+      setIsErrorModalOpen(true);
+    }
+  }, [error]);
+
   const connected = useMemo(
     () => new Set(connectedProviders.map((p) => p.toUpperCase())),
     [connectedProviders],
@@ -164,17 +175,23 @@ export function ConnectPlatformCards({
 
   return (
     <div className="space-y-4">
-      {error && ERROR_MSG[error] ? (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {ERROR_MSG[error]}
-          {search.get("msg") ? ` (${search.get("msg")})` : ""}
-          {(error === "oauth_config" || error === "missing_creds") && (
-            <Link href="/accounts/setup" className="font-semibold underline">
-              Kurulum
-            </Link>
-          )}
-        </p>
-      ) : null}
+      {error && ERROR_MSG[error] && (
+        <ActionModal 
+          config={{
+            isOpen: isErrorModalOpen,
+            title: "Bağlantı Hatası",
+            description: ERROR_MSG[error] + (search.get("msg") ? ` (${search.get("msg")})` : ""),
+            type: "error",
+            confirmText: "Anladım"
+          }}
+          setConfig={(c) => {
+            if (!c.isOpen) {
+              setIsErrorModalOpen(false);
+              router.replace("/accounts");
+            }
+          }}
+        />
+      )}
       {soon ? (
         <p className="rounded-xl border border-ink-100 bg-ink-50 px-4 py-3 text-sm text-ink-600">
           Google Business Profile yakında eklenecek.

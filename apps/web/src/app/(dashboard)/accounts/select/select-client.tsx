@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Avatar } from "@heroui/react";
-
+import { ActionModal } from "@/components/ui/action-modal";
 type TempAccount = {
   providerAccountId: string;
   accountName: string;
@@ -79,11 +79,18 @@ export function SelectAccountsClient({
           Aşağıdaki listeden SocialMarka çalışma alanınıza bağlamak istediğiniz sayfaları/hesapları seçin.
         </p>
 
-        {error && (
-          <div className="mb-4 rounded-xl bg-rose-50 p-3 text-xs text-rose-600 dark:bg-rose-950/30 overflow-auto max-h-60">
-            <pre>{error}</pre>
-          </div>
-        )}
+        <ActionModal 
+          config={{
+            isOpen: !!error,
+            title: "İçe Aktarma Hatası",
+            description: error,
+            type: "error",
+            confirmText: "Anladım"
+          }}
+          setConfig={(c) => {
+            if (!c.isOpen) setError("");
+          }}
+        />
 
         <div className="space-y-3 mb-6">
           {list.map((acc) => {

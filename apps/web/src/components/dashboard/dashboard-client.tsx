@@ -171,7 +171,7 @@ export function DashboardClient({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Queued Posts */}
         <div className="rounded-2xl border border-ink-200/60 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] flex items-start gap-4">
-          <div className="rounded-xl bg-blue-50 p-3 text-blue-500">
+          <div className="rounded-xl bg-blue-50 dark:bg-blue-950/50 p-3 text-blue-500">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -193,7 +193,7 @@ export function DashboardClient({
 
         {/* Delivered (30 Days) */}
         <div className="rounded-2xl border border-ink-200/60 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] flex items-start gap-4">
-          <div className="rounded-xl bg-green-50 p-3 text-green-500">
+          <div className="rounded-xl bg-green-50 dark:bg-green-950/50 p-3 text-green-500">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -215,7 +215,7 @@ export function DashboardClient({
 
         {/* Unscheduled Posts */}
         <div className="rounded-2xl border border-ink-200/60 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] flex items-start gap-4">
-          <div className="rounded-xl bg-amber-50 p-3 text-amber-500">
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-950/50 p-3 text-amber-500">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -237,7 +237,7 @@ export function DashboardClient({
 
         {/* Error Posts */}
         <div className="rounded-2xl border border-ink-200/60 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition hover:shadow-[0_4px_16px_rgba(0,0,0,0.06)] flex items-start gap-4">
-          <div className="rounded-xl bg-rose-50 p-3 text-rose-500">
+          <div className="rounded-xl bg-rose-50 dark:bg-rose-950/50 p-3 text-rose-500">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -296,13 +296,10 @@ export function DashboardClient({
           <span className="text-[10px] text-ink-400 mt-0.5">Sosyal Gelen Kutusu</span>
         </Link>
         {role === "ADMIN" || role === "SYSTEM_ADMIN" ? (
-          <Link
-            href="/admin"
-            className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-200/60 bg-white/70 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-sky-50/20 text-center"
-          >
-            <span className="text-sm font-bold text-ink-900">Yönetim</span>
-            <span className="text-[10px] text-ink-400 mt-0.5">Ekip & Sistem</span>
-          </Link>
+          <div className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-100 bg-ink-50/30 text-center">
+            <span className="text-sm font-semibold text-ink-400">SocialMarka</span>
+            <span className="text-[10px] text-ink-300 mt-0.5">Yönetici Yetkisi</span>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center p-4 rounded-2xl border border-ink-100 bg-ink-50/30 text-center">
             <span className="text-sm font-semibold text-ink-400">SocialMarka</span>
