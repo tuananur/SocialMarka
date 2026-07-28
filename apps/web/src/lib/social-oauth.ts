@@ -109,7 +109,7 @@ export function buildPlatformAuthorizeUrl(opts: {
       return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&state=${enc(state)}&scope=${enc("openid profile email w_member_social")}`;
     }
     case "YOUTUBE": {
-      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile")}&access_type=offline&prompt=consent&state=${enc(state)}`;
+      return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${enc(creds.clientId)}&redirect_uri=${enc(redirectUri)}&response_type=code&scope=${enc("https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl https://www.googleapis.com/auth/userinfo.profile")}&access_type=offline&prompt=consent&state=${enc(state)}`;
     }
     case "X": {
       if (!codeChallenge) return null;
