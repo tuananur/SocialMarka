@@ -57,6 +57,7 @@ export async function getLiveActivities(workspaceId: string) {
       targetPost: pub.post.content?.slice(0, 100) || undefined,
       type: "REPOST",
       timestamp: (pub.publishedAt || new Date()).getTime(),
+      isSystem: true,
     });
   }
 
@@ -80,6 +81,7 @@ export async function getLiveActivities(workspaceId: string) {
       time: formatRelativeTime(conn.createdAt),
       type: "FOLLOW",
       timestamp: conn.createdAt.getTime(),
+      isSystem: true,
     });
   }
 

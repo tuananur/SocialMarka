@@ -26,6 +26,7 @@ type Activity = {
   targetPost?: string;
   type: "LIKE" | "FOLLOW" | "REPOST" | "SAVE";
   thanked?: boolean;
+  isSystem?: boolean;
 };
 
 const INITIAL_ACTIVITIES: Activity[] = [
@@ -555,37 +556,49 @@ export function InboxClient({
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto">
-                    {act.type === "LIKE" || act.type === "REPOST" || act.type === "SAVE" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={`font-semibold text-xs ${
-                          act.thanked ? "border-emerald-500 text-emerald-600 bg-emerald-50" : ""
-                        }`}
-                        onPress={() => handleThankActivity(act.id)}
-                      >
-                        {act.thanked ? "✓ Teşekkür Edildi" : "Teşekkür Et"}
-                      </Button>
-                    ) : null}
-                    {act.type === "FOLLOW" ? (
-                      <Button
-                        size="sm"
-                        variant={act.thanked ? "outline" : "primary"}
-                        className={`font-semibold text-xs ${
-                          act.thanked ? "border-emerald-500 text-emerald-600 bg-emerald-50" : ""
-                        }`}
-                        onPress={() => handleThankActivity(act.id)}
-                      >
-                        {act.thanked ? "✓ Takip Edildi" : "Geri Takip Et"}
-                      </Button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-600 hover:bg-ink-50"
-                      onClick={() => alert(`${act.senderName} profili simüle ediliyor.`)}
-                    >
-                      Profili Gör
-                    </button>
+                    {!act.isSystem && (
+                      <>
+                        {(act.type === "LIKE" || act.type === "REPOST" || act.type === "SAVE") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={`font-semibold text-xs ${
+                              act.thanked ? "border-emerald-500 text-emerald-600 bg-emerald-50" : ""
+                            }`}
+                            onPress={() => handleThankActivity(act.id)}
+                          >
+                            {act.thanked ? "✓ Teşekkür Edildi" : "Teşekkür Et"}
+                          </Button>
+                        )}
+                        {act.type === "FOLLOW" && (
+                          <Button
+                            size="sm"
+                            variant={act.thanked ? "outline" : "primary"}
+                            className={`font-semibold text-xs ${
+                              act.thanked ? "border-emerald-500 text-emerald-600 bg-emerald-50" : ""
+                            }`}
+                            onPress={() => handleThankActivity(act.id)}
+                          >
+                            {act.thanked ? "✓ Takip Edildi" : "Geri Takip Et"}
+                          </Button>
+                        )}
+                        <button
+                          type="button"
+                          className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-600 hover:bg-ink-50"
+                          onClick={() => {
+                            const url =
+                              act.platform === "YOUTUBE" ? `https://youtube.com/${act.senderName.startsWith('@') ? act.senderName : '@' + act.senderName}` :
+                              act.platform === "INSTAGRAM" ? `https://instagram.com/${act.senderName.replace('@', '')}` :
+                              act.platform === "TIKTOK" ? `https://tiktok.com/@${act.senderName.replace('@', '')}` :
+                              act.platform === "X" || act.platform === "TWITTER" ? `https://x.com/${act.senderName.replace('@', '')}` :
+                              act.platform === "FACEBOOK" ? `https://facebook.com/${act.senderName}` : "#";
+                            window.open(url, "_blank");
+                          }}
+                        >
+                          Profili Gör
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
