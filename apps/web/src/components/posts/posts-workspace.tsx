@@ -167,7 +167,7 @@ export function PostsWorkspace({
   }
 
   async function savePost(opts: { shareNow?: boolean; asDraft?: boolean } = {}) {
-    if (!canEdit) return;
+    if (!canEdit || busy) return;
     const issues = composer.validateForSave(opts);
     if (issues.length) {
       setMessage(issues[0].message);

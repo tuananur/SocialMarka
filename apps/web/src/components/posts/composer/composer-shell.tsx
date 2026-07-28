@@ -429,16 +429,16 @@ export function ComposerShell({
                 <Button
                   variant="outline"
                   className="rounded-r-none font-semibold"
-                  isDisabled={draftDisabled}
+                  isDisabled={draftDisabled || busy}
                   onPress={onSaveDraft}
                 >
-                  Taslak Kaydet
+                  {busy ? "Kaydediliyor..." : "Taslak Kaydet"}
                 </Button>
                 <div className="h-10 w-[1px] bg-ink-200 dark:bg-ink-800" />
                 <Button
                   variant="outline"
                   className="rounded-l-none px-2.5 font-semibold"
-                  isDisabled={draftDisabled}
+                  isDisabled={draftDisabled || busy}
                   onPress={() => setIsSaveDraftMenuOpen(!isSaveDraftMenuOpen)}
                 >
                   ▲
@@ -454,6 +454,7 @@ export function ComposerShell({
                           setIsSaveDraftMenuOpen(false);
                           onSaveDraft();
                         }}
+                        disabled={busy}
                       >
                         📂 Taslak Olarak Kaydet
                       </button>
@@ -467,16 +468,16 @@ export function ComposerShell({
                 <Button
                   variant="primary"
                   className="rounded-r-none pr-3 font-semibold shadow-md shadow-accent/20"
-                  isDisabled={scheduleDisabled}
+                  isDisabled={scheduleDisabled || busy}
                   onPress={() => setIsScheduleModalOpen(true)}
                 >
-                  📅 Zamanlama Ayarla
+                  {busy ? "Zamanlanıyor..." : "📅 Zamanlama Ayarla"}
                 </Button>
                 <div className="h-10 w-[1px] bg-white/30" />
                 <Button
                   variant="primary"
                   className="rounded-l-none px-2.5 font-semibold shadow-md shadow-accent/20"
-                  isDisabled={scheduleDisabled}
+                  isDisabled={scheduleDisabled || busy}
                   onPress={() => setIsScheduleMenuOpen(!isScheduleMenuOpen)}
                 >
                   ▲
@@ -492,9 +493,9 @@ export function ComposerShell({
                           setIsScheduleMenuOpen(false);
                           onShareNow();
                         }}
-                        disabled={shareDisabled}
+                        disabled={shareDisabled || busy}
                       >
-                        <span>🚀</span> Hemen Paylaş
+                        <span>🚀</span> {busy ? "Paylaşılıyor..." : "Hemen Paylaş"}
                       </button>
                       <button
                         type="button"

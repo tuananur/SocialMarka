@@ -136,6 +136,14 @@ export type ExchangedTokens = {
   providerAccountId: string;
   accountName: string;
   profilePicUrl?: string;
+  multipleAccounts?: {
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn?: number;
+    providerAccountId: string;
+    accountName: string;
+    profilePicUrl?: string;
+  }[];
 };
 
 export async function exchangeOAuthCode(opts: {
@@ -464,83 +472,84 @@ async function exchangeFacebook(
     console.log("[Facebook OAuth] Total pages fetched:", allPages.length, allPages.map((p: any) => ({ id: p.id, name: p.name })));
 
     if (allPages.length > 0) {
-      let page = allPages.find(
-        (p: any) =>
-          p.name?.toLowerCase().includes("jaglion") ||
-          p.id === "102151459388246" ||
-          p.id === "431790324477711"
-      );
-      if (!page) {
-        page = allPages[0];
-      }
+      const multipleAccounts: any[] = [];
 
-      console.log("[Facebook OAuth] Selected Page for connection:", {
-        id: page.id,
-        name: page.name,
-      });
-
-      // Fetch complete details for the selected page if needed
-      if (page.id && (!page.access_token || !page.picture)) {
-        try {
-          const detailRes = await fetch(
-            `https://graph.facebook.com/v19.0/${page.id}?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
-          );
-          if (detailRes.ok) {
-            const detailJson = await detailRes.json();
-            page = { ...page, ...detailJson };
+      for (const pageItem of allPages) {
+        let page = { ...pageItem };
+        // Fetch complete details for the page if needed
+        if (page.id && (!page.access_token || !page.picture)) {
+          try {
+            const detailRes = await fetch(
+              `https://graph.facebook.com/v19.0/${page.id}?fields=id,name,access_token,picture,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`
+            );
+            if (detailRes.ok) {
+              const detailJson = await detailRes.json();
+              page = { ...page, ...detailJson };
+            }
+          } catch (detailErr: any) {
+            console.error("[Facebook OAuth] Single page detail fetch error:", detailErr.message || detailErr);
           }
-        } catch (detailErr: any) {
-          console.error("[Facebook OAuth] Single page detail fetch error:", detailErr.message || detailErr);
+        }
+
+        const ig = page.instagram_business_account;
+        if (isInstagram && ig?.id) {
+          // Subscribe the Instagram business account
+          try {
+            const subUrl = new URL(`https://graph.facebook.com/v19.0/${ig.id}/subscribed_apps`);
+            subUrl.searchParams.set("subscribed_fields", "comments,messages");
+            subUrl.searchParams.set("access_token", page.access_token || userToken);
+            await fetch(subUrl.toString(), { method: "POST" });
+          } catch (subErr) {
+            console.error("[Facebook OAuth IG] Subscribed apps registration failed:", subErr);
+          }
+          // Subscribe the Facebook page as well (so we get both!)
+          try {
+            const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+            subUrl.searchParams.set("subscribed_fields", "feed,messages");
+            subUrl.searchParams.set("access_token", page.access_token || userToken);
+            await fetch(subUrl.toString(), { method: "POST" });
+          } catch (subErr) {
+            console.error("[Facebook OAuth Page] Subscribed apps registration failed:", subErr);
+          }
+
+          multipleAccounts.push({
+            accessToken: page.access_token || userToken,
+            expiresIn: expiresIn || 5184000,
+            providerAccountId: String(ig.id),
+            accountName: String(ig.username || ig.name || page.name),
+            profilePicUrl: ig.profile_picture_url || page.picture?.data?.url || undefined,
+          });
+        } else if (!isInstagram) {
+          // Subscribe the Facebook page
+          try {
+            const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
+            subUrl.searchParams.set("subscribed_fields", "feed,messages");
+            subUrl.searchParams.set("access_token", page.access_token || userToken);
+            const subRes = await fetch(subUrl.toString(), { method: "POST" });
+            const subData = await subRes.json();
+            console.log("[Facebook OAuth Page] Subscribed apps registration response:", subData);
+          } catch (subErr) {
+            console.error("[Facebook OAuth Page Only] Subscribed apps registration failed:", subErr);
+          }
+
+          multipleAccounts.push({
+            accessToken: page.access_token || userToken,
+            expiresIn: expiresIn || 5184000,
+            providerAccountId: String(page.id),
+            accountName: String(page.name),
+            profilePicUrl: page.picture?.data?.url || undefined,
+          });
         }
       }
 
-      const ig = page.instagram_business_account;
-      if (isInstagram && ig?.id) {
-        // Subscribe the Instagram business account
-        try {
-          const subUrl = new URL(`https://graph.facebook.com/v19.0/${ig.id}/subscribed_apps`);
-          subUrl.searchParams.set("subscribed_fields", "comments,messages");
-          subUrl.searchParams.set("access_token", page.access_token || userToken);
-          await fetch(subUrl.toString(), { method: "POST" });
-        } catch (subErr) {
-          console.error("[Facebook OAuth IG] Subscribed apps registration failed:", subErr);
-        }
-        // Subscribe the Facebook page as well (so we get both!)
-        try {
-          const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
-          subUrl.searchParams.set("subscribed_fields", "feed,messages");
-          subUrl.searchParams.set("access_token", page.access_token || userToken);
-          await fetch(subUrl.toString(), { method: "POST" });
-        } catch (subErr) {
-          console.error("[Facebook OAuth Page] Subscribed apps registration failed:", subErr);
-        }
-
+      if (multipleAccounts.length > 0) {
         return {
-          accessToken: page.access_token || userToken,
-          expiresIn: expiresIn || 5184000,
-          providerAccountId: String(ig.id),
-          accountName: String(ig.username || ig.name || page.name),
-          profilePicUrl: ig.profile_picture_url || page.picture?.data?.url,
-        };
-      } else {
-        // Subscribe the Facebook page
-        try {
-          const subUrl = new URL(`https://graph.facebook.com/v19.0/${page.id}/subscribed_apps`);
-          subUrl.searchParams.set("subscribed_fields", "feed,messages");
-          subUrl.searchParams.set("access_token", page.access_token || userToken);
-          const subRes = await fetch(subUrl.toString(), { method: "POST" });
-          const subData = await subRes.json();
-          console.log("[Facebook OAuth Page] Subscribed apps registration response:", subData);
-        } catch (subErr) {
-          console.error("[Facebook OAuth Page Only] Subscribed apps registration failed:", subErr);
-        }
-
-        return {
-          accessToken: page.access_token || userToken,
-          expiresIn: expiresIn || 5184000,
-          providerAccountId: String(page.id),
-          accountName: String(page.name),
-          profilePicUrl: page.picture?.data?.url,
+          accessToken: multipleAccounts[0].accessToken,
+          expiresIn: multipleAccounts[0].expiresIn,
+          providerAccountId: multipleAccounts[0].providerAccountId,
+          accountName: multipleAccounts[0].accountName,
+          profilePicUrl: multipleAccounts[0].profilePicUrl,
+          multipleAccounts,
         };
       }
     } else {

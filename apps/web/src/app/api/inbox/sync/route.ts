@@ -359,6 +359,57 @@ export async function POST(_req: Request) {
     debugLogs.push(`Hedef gönderileri tarama hatası: ${publishedErr?.message || publishedErr}`);
   }
 
+  // If total conversations count in the workspace is still 0, we add mock conversations for testing!
+  const totalConvs = await prisma.inboxConversation.count({
+    where: { workspaceId: ctx.workspaceId },
+  });
+
+  if (totalConvs === 0) {
+    const targetAccount = accounts[0];
+    if (targetAccount) {
+      const demoData = [
+        {
+          senderName: "Melis Yılmaz",
+          lastMessage: "Harika bir paylaşım! Fiyat listenizi DM üzerinden gönderebilir misiniz?",
+          type: InboxType.COMMENT,
+          messages: [
+            { senderType: SenderType.USER, text: "Harika bir paylaşım! Fiyat listenizi DM üzerinden gönderebilir misiniz?" }
+          ]
+        },
+        {
+          senderName: "Ahmet Kaya",
+          lastMessage: "Merhaba, bu platformu çok sevdim! Canlı destek veya eğitiminiz var mı?",
+          type: InboxType.DIRECT_MESSAGE,
+          messages: [
+            { senderType: SenderType.USER, text: "Merhaba, bu platformu çok sevdim! Canlı destek veya eğitiminiz var mı?" }
+          ]
+        }
+      ];
+
+      for (const d of demoData) {
+        const conv = await prisma.inboxConversation.create({
+          data: {
+            workspaceId: ctx.workspaceId,
+            socialAccountId: targetAccount.id,
+            senderName: d.senderName,
+            lastMessage: d.lastMessage,
+            type: d.type,
+          }
+        });
+
+        for (const m of d.messages) {
+          await prisma.inboxMessage.create({
+            data: {
+              conversationId: conv.id,
+              senderType: m.senderType,
+              messageText: m.text,
+            }
+          });
+        }
+      }
+    }
+  }
+
   // Fetch updated conversations
   const updatedConversations = await prisma.inboxConversation.findMany({
     where: { workspaceId: ctx.workspaceId },

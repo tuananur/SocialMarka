@@ -186,6 +186,12 @@ export function preflightValidate(input: PreflightInput): PreflightIssue[] {
         message: "YouTube için video dosyası gerekli",
       });
     }
+    if (provider === "TIKTOK" && !input.asDraft && !hasVideo) {
+      issues.push({
+        code: "tiktok_video",
+        message: "TikTok için video dosyası gerekli",
+      });
+    }
     if (provider === "PINTEREST" && !input.asDraft) {
       if (!input.pinTitle.trim()) {
         issues.push({ code: "pin_title", message: "Pinterest için başlık gerekli" });
@@ -204,6 +210,12 @@ export function preflightValidate(input: PreflightInput): PreflightIssue[] {
         issues.push({
           code: `${provider}_format_media`,
           message: `${provider === "INSTAGRAM" ? "Instagram" : "Facebook"} ${fmt === "story" ? "Hikâye" : "Reel"} için medya gerekli`,
+        });
+      }
+      if (fmt === "reel" && hasMedia && !hasVideo) {
+        issues.push({
+          code: `${provider}_reel_video`,
+          message: `${provider === "INSTAGRAM" ? "Instagram" : "Facebook"} Reel için video dosyası gerekli`,
         });
       }
     }
