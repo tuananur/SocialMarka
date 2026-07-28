@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma, SenderType, AccountStatus, InboxType } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
-import { resolveAccessToken } from "@socialmarka/shared";
+import { resolveAccessToken, decryptToken, encryptToken, refreshGoogleAccessToken } from "@socialmarka/shared";
 
 export async function POST(_req: Request) {
   const ctx = await getWorkspaceContext();
@@ -291,6 +291,116 @@ export async function POST(_req: Request) {
 
     for (const target of publishedTargets) {
       if (!target.remotePostId || !target.socialAccount) continue;
+
+      // 2.a. Fetch comments directly for YouTube
+      if (target.socialAccount.provider === "YOUTUBE") {
+        try {
+          let accessToken = resolveAccessToken(target.socialAccount.encryptedAccessToken);
+          
+          // Refresh Google OAuth token if expired
+          const expiresAt = target.socialAccount.tokenExpiresAt;
+          const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() + 60000 : true;
+          if (isExpired && target.socialAccount.encryptedRefreshToken) {
+            try {
+              const decryptedRefresh = decryptToken(target.socialAccount.encryptedRefreshToken);
+              const refreshed = await refreshGoogleAccessToken(decryptedRefresh);
+              accessToken = refreshed.accessToken;
+              
+              await prisma.socialAccount.update({
+                where: { id: target.socialAccount.id },
+                data: {
+                  encryptedAccessToken: encryptToken(refreshed.accessToken),
+                  tokenExpiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
+                  ...(refreshed.refreshToken ? { encryptedRefreshToken: encryptToken(refreshed.refreshToken) } : {}),
+                }
+              });
+              debugLogs.push(`[${target.socialAccount.accountName}] YouTube token yenilendi`);
+            } catch (refreshErr: any) {
+              debugLogs.push(`[${target.socialAccount.accountName}] YouTube token yenileme hatası: ${refreshErr?.message}`);
+            }
+          }
+
+          const yRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(target.remotePostId)}&maxResults=100`,
+            {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            }
+          );
+
+          if (yRes.ok) {
+            const yJson = await yRes.json();
+            const items = yJson.items || [];
+            debugLogs.push(`[${target.socialAccount.accountName}] YouTube videosu ${target.remotePostId} için ${items.length} yorum bulundu`);
+            
+            for (const item of items) {
+              const commentSnippet = item.snippet?.topLevelComment?.snippet;
+              if (!commentSnippet) continue;
+              
+              const sender = commentSnippet.authorDisplayName || "youtube_user";
+              const commentText = commentSnippet.textOriginal || commentSnippet.textDisplay || "";
+              const senderAvatar = commentSnippet.authorProfileImageUrl || "";
+              const remoteId = item.snippet.topLevelComment.id;
+              const createdAt = commentSnippet.publishedAt ? new Date(commentSnippet.publishedAt) : new Date();
+              
+              if (!commentText) continue;
+
+              let conversation = await prisma.inboxConversation.findFirst({
+                where: {
+                  socialAccountId: target.socialAccountId,
+                  senderName: sender,
+                  type: InboxType.COMMENT,
+                },
+              });
+
+              if (!conversation) {
+                conversation = await prisma.inboxConversation.create({
+                  data: {
+                    workspaceId: ctx.workspaceId,
+                    socialAccountId: target.socialAccountId,
+                    senderName: sender,
+                    senderAvatar,
+                    lastMessage: commentText,
+                    lastMessageAt: createdAt,
+                    type: InboxType.COMMENT,
+                    remoteId,
+                  },
+                });
+              } else {
+                await prisma.inboxConversation.update({
+                  where: { id: conversation.id },
+                  data: {
+                    lastMessage: commentText,
+                    lastMessageAt: createdAt,
+                    senderAvatar,
+                    isRead: false,
+                  }
+                });
+              }
+
+              const existingMsg = await prisma.inboxMessage.findFirst({
+                where: { conversationId: conversation.id, messageText: commentText },
+              });
+              if (!existingMsg) {
+                await prisma.inboxMessage.create({
+                  data: {
+                    conversationId: conversation.id,
+                    senderType: sender.toLowerCase() === target.socialAccount.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                    messageText: commentText,
+                    createdAt,
+                  },
+                });
+              }
+            }
+          } else {
+            const errJson = await yRes.json().catch(() => ({}));
+            debugLogs.push(`[${target.socialAccount.accountName}] YouTube yorum çekme hatası: ${errJson.error?.message || yRes.statusText}`);
+          }
+        } catch (ytErr: any) {
+          debugLogs.push(`[${target.socialAccount.accountName}] YouTube tarama hatası: ${ytErr?.message || ytErr}`);
+        }
+        continue;
+      }
+
       try {
         const token = resolveAccessToken(target.socialAccount.encryptedAccessToken);
         const commentUrls = [
