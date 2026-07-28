@@ -47,18 +47,24 @@ export function SelectAccountsClient({
         body: JSON.stringify({ selectedIds }),
       });
       const data = await res.json();
+      
+      // DEBUG BİLGİSİNİ EKRANA YANSIT
+      setError(JSON.stringify({ status: res.status, ok: res.ok, data }, null, 2));
+
       if (res.ok && data.ok) {
-        router.push(
-          `/accounts?status=success&provider=${provider}&name=${encodeURIComponent(
-            selectedIds.length > 1 ? `${selectedIds.length} hesap` : data.firstAccountName || "Hesap"
-          )}`
-        );
+        // Başarılı olsa bile hemen yönlendirme, 3 saniye ekranda kalsın ki logu görebilelim
+        setTimeout(() => {
+          router.push(
+            `/accounts?status=success&provider=${provider}&name=${encodeURIComponent(
+              selectedIds.length > 1 ? `${selectedIds.length} hesap` : data.firstAccountName || "Hesap"
+            )}`
+          );
+        }, 3000);
       } else {
-        setError(data.error || "İçe aktarma sırasında bir hata oluştu.");
         setBusy(false);
       }
     } catch (err: any) {
-      setError(err?.message || "Bağlantı hatası oluştu.");
+      setError(JSON.stringify({ error: "Fetch failed", message: err?.message }, null, 2));
       setBusy(false);
     }
   };
@@ -74,8 +80,8 @@ export function SelectAccountsClient({
         </p>
 
         {error && (
-          <div className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-600 dark:bg-rose-950/30">
-            {error}
+          <div className="mb-4 rounded-xl bg-rose-50 p-3 text-xs text-rose-600 dark:bg-rose-950/30 overflow-auto max-h-60">
+            <pre>{error}</pre>
           </div>
         )}
 
