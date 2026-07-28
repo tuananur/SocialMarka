@@ -176,13 +176,18 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
 
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   async function handleSync() {
     setSyncing(true);
     setSyncStatus(null);
+    setDebugLogs([]);
     try {
       const res = await fetch("/api/inbox/sync", { method: "POST" });
       const data = await res.json();
+      if (data.debugLogs) {
+        setDebugLogs(data.debugLogs);
+      }
       if (res.ok && data.conversations) {
         setConversations(data.conversations);
         if (!activeId && data.conversations[0]?.id) {
@@ -265,9 +270,19 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
       </div>
 
       {syncStatus && (
-        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-medium text-sky-800 flex items-center justify-between shadow-sm">
-          <span>{syncStatus}</span>
-          <button type="button" onClick={() => setSyncStatus(null)} className="font-bold hover:text-sky-900 ml-2">✕</button>
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs font-medium text-sky-800 flex flex-col gap-1.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span>{syncStatus}</span>
+            <button type="button" onClick={() => setSyncStatus(null)} className="font-bold hover:text-sky-900 ml-2">✕</button>
+          </div>
+          {debugLogs && debugLogs.length > 0 && (
+            <details className="mt-1 cursor-pointer">
+              <summary className="font-semibold select-none text-[10px] text-sky-600 hover:text-sky-800">Senkronizasyon Logları (Detay)</summary>
+              <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white dark:bg-slate-900 border border-sky-100 p-2 font-mono text-[9px] leading-relaxed text-slate-600">
+                {debugLogs.join("\n")}
+              </pre>
+            </details>
+          )}
         </div>
       )}
 
