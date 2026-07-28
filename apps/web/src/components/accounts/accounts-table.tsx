@@ -216,7 +216,7 @@ export function AccountsTable({
       <div className="overflow-hidden rounded-xl border border-ink-200/80 bg-white shadow-[var(--shadow-soft)]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-ink-100 bg-[#fafbfc] dark:bg-ink-950 dark:border-ink-800 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+            <thead className="border-b border-ink-100 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
               <tr>
                 <th className="px-4 py-3">
                   <input

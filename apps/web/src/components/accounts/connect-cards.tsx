@@ -204,7 +204,7 @@ export function ConnectPlatformCards({
           return (
             <div
               key={p.id}
-              className={`relative flex flex-col items-center rounded-2xl border bg-white p-5 text-center shadow-[var(--shadow-soft)] transition-all duration-200 dark:bg-ink-950 ${
+              className={`relative flex flex-col items-center rounded-2xl border bg-white p-5 text-center shadow-[var(--shadow-soft)] transition-all duration-200 ${
                 isLinked ? "border-emerald-300 ring-1 ring-emerald-100 dark:border-emerald-800 dark:ring-emerald-950" : "border-ink-200/80 dark:border-ink-800"
               }`}
             >

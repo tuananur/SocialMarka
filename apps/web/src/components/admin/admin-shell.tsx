@@ -109,7 +109,7 @@ export function AdminShell({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[#f1f5f9] dark:bg-ink-950">
+      <div className="flex min-w-0 flex-1 flex-col bg-[#f1f5f9] dark:bg-ink-50">
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-ink-200/70 bg-white/90 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button

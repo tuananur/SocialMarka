@@ -276,7 +276,7 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
           <div className="grid min-w-0 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
             {/* Sol Liste Paneli */}
             <div className="min-w-0 border-b border-ink-100 lg:border-b-0 lg:border-r dark:border-ink-800">
-              <div className="border-b border-ink-100 p-3 space-y-2 bg-[#fafbfc] dark:bg-ink-950 dark:border-ink-800">
+              <div className="border-b border-ink-100 p-3 space-y-2 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800">
                 <Input
                   fullWidth
                   placeholder="İsim veya mesaj ara..."
@@ -349,7 +349,7 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
             <div className="flex min-h-[420px] min-w-0 flex-col lg:min-h-[580px]">
               {active ? (
                 <>
-                  <div className="flex items-center gap-3 border-b border-ink-100 px-4 py-3 bg-[#fafbfc] dark:bg-ink-950 dark:border-ink-800">
+                  <div className="flex items-center gap-3 border-b border-ink-100 px-4 py-3 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800">
                     <Avatar className="h-9 w-9 bg-ink-200">
                       {active.senderAvatar ? (
                         <Avatar.Image src={active.senderAvatar} alt="" />
@@ -381,7 +381,7 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
                       </Button>
                     </div>
                   </div>
-                  <div className="flex-1 space-y-4 overflow-y-auto p-4 bg-[#fafbfc]/35 dark:bg-ink-900/35">
+                  <div className="flex-1 space-y-4 overflow-y-auto p-4 bg-[#fafbfc]/35 dark:bg-ink-50/35">
                     {active.messages.map((m) => (
                       <div
                         key={m.id}
@@ -470,7 +470,7 @@ export function InboxClient({ conversations: initial }: { conversations: Convers
               {filteredActivities.map((act) => (
                 <div
                   key={act.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-ink-100 bg-[#fafbfc] dark:bg-ink-950 dark:border-ink-800 transition hover:shadow-sm"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-ink-100 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800 transition hover:shadow-sm"
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative">

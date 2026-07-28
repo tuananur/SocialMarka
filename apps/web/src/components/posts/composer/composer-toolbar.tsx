@@ -82,7 +82,7 @@ export function ComposerToolbar({
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-1 border-t border-ink-100 bg-[#fafbfc] dark:bg-ink-950 dark:border-ink-800 px-2 py-2">
+      <div className="flex flex-wrap items-center gap-1 border-t border-ink-100 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800 px-2 py-2">
         <ToolIcon label="📎" title="Medya ekle" onClick={onMediaClick} disabled={!canEdit} />
         <ToolIcon
           label="😊"

@@ -412,6 +412,10 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
   const done = new URL("/accounts", origin);
   done.searchParams.set("status", "success");
   done.searchParams.set("provider", provider);
-  done.searchParams.set("name", firstAccountName || accountName);
+  if (accountsToSave.length > 1) {
+    done.searchParams.set("name", `${accountsToSave.length} hesap`);
+  } else {
+    done.searchParams.set("name", firstAccountName || accountName);
+  }
   return NextResponse.redirect(done);
 }

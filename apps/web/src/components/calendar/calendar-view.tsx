@@ -425,7 +425,7 @@ function CalendarCellPost({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full min-w-0 gap-1.5 rounded-md border border-ink-100 bg-[#fafbfc] dark:bg-ink-900 dark:border-ink-800 p-1 text-left transition hover:border-brand-200 hover:bg-white dark:hover:bg-ink-950"
+      className="flex w-full min-w-0 gap-1.5 rounded-md border border-ink-100 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800 p-1 text-left transition hover:border-brand-200 hover:bg-white dark:hover:bg-ink-100"
     >
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-1">

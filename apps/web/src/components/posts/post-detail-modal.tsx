@@ -186,7 +186,7 @@ export function PostDetailModal({
             ))}
           </div>
         </div>
-        <div className="flex min-h-[200px] flex-col bg-[#fafbfc] dark:bg-ink-950 p-4 lg:min-h-0">
+        <div className="flex min-h-[200px] flex-col bg-[#fafbfc] dark:bg-ink-50 p-4 lg:min-h-0">
           <p className="mb-2 text-sm font-semibold text-ink-800">Hesap hedefleri</p>
           <p className="text-sm text-ink-500">
             Bu gönderinin yayın durumu yukarıdaki hesap satırlarında görünür. Yorum özelliği yakında.
