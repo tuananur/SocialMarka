@@ -295,8 +295,69 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
           return { success: false, errorMessage: "Bilinmeyen platform" };
       }
     },
-    async sendInboxReply() {
-      return { success: false, errorMessage: "Gelen kutusu yanıtı henüz canlı değil" };
+    async sendInboxReply(params: {
+      accessToken: string;
+      conversationRemoteId: string;
+      message: string;
+    }) {
+      try {
+        if (platform === "YOUTUBE") {
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/comments?part=snippet`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${params.accessToken}`,
+            },
+            body: JSON.stringify({
+              snippet: {
+                parentId: params.conversationRemoteId,
+                textOriginal: params.message,
+              },
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, errorMessage: err.error?.message || res.statusText };
+          }
+          return { success: true };
+        }
+
+        if (platform === "INSTAGRAM") {
+          const res = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(params.conversationRemoteId)}/replies`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: params.message,
+              access_token: params.accessToken,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, errorMessage: err.error?.message || res.statusText };
+          }
+          return { success: true };
+        }
+
+        if (platform === "FACEBOOK") {
+          const res = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(params.conversationRemoteId)}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: params.message,
+              access_token: params.accessToken,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { success: false, errorMessage: err.error?.message || res.statusText };
+          }
+          return { success: true };
+        }
+
+        return { success: false, errorMessage: "Bu platform için gelen kutusu yanıtı desteklenmiyor" };
+      } catch (err: any) {
+        return { success: false, errorMessage: err?.message || String(err) };
+      }
     },
     async refreshToken(refreshToken: string) {
       if (platform === "YOUTUBE") {

@@ -382,13 +382,43 @@ export function InboxClient({
                       )}
                     </Avatar>
                     <div>
-                      <div className="text-sm font-semibold text-ink-900">{active.senderName}</div>
+                      <a
+                        href={
+                          active.socialAccount.provider === "YOUTUBE" ? `https://youtube.com/${active.senderName.startsWith('@') ? active.senderName : '@' + active.senderName}` :
+                          active.socialAccount.provider === "INSTAGRAM" ? `https://instagram.com/${active.senderName.replace('@', '')}` :
+                          active.socialAccount.provider === "TIKTOK" ? `https://tiktok.com/@${active.senderName.replace('@', '')}` :
+                          active.socialAccount.provider === "X" ? `https://x.com/${active.senderName.replace('@', '')}` :
+                          active.socialAccount.provider === "FACEBOOK" ? `https://facebook.com/${active.senderName}` : "#"
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-semibold text-ink-900 hover:text-slate-600 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {active.senderName}
+                        <span className="text-[10px] font-normal text-slate-400">↗</span>
+                      </a>
                       <div className="text-xs text-ink-400 flex items-center gap-1">
                         <ProviderIcon provider={active.socialAccount.provider} size={12} />
                         <span>{active.socialAccount.accountName}</span>
                       </div>
                     </div>
                     <div className="ml-auto flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          const url =
+                            active.socialAccount.provider === "YOUTUBE" ? `https://youtube.com/${active.senderName.startsWith('@') ? active.senderName : '@' + active.senderName}` :
+                            active.socialAccount.provider === "INSTAGRAM" ? `https://instagram.com/${active.senderName.replace('@', '')}` :
+                            active.socialAccount.provider === "TIKTOK" ? `https://tiktok.com/@${active.senderName.replace('@', '')}` :
+                            active.socialAccount.provider === "X" ? `https://x.com/${active.senderName.replace('@', '')}` :
+                            active.socialAccount.provider === "FACEBOOK" ? `https://facebook.com/${active.senderName}` : "#";
+                          window.open(url, "_blank");
+                        }}
+                        className="bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 h-8"
+                      >
+                        Profili Gör & Takip Et 👤
+                      </Button>
                       <Chip size="sm" variant="soft" className="bg-amber-400/20 text-amber-900 font-semibold border-none">
                         <Chip.Label>
                           {active.type === "COMMENT" ? "Yorum Yanıtı" : "Direkt Mesaj"}
@@ -399,7 +429,7 @@ export function InboxClient({
                         variant="outline"
                         isDisabled={deletingId === active.id}
                         onClick={() => handleDeleteConversation(active.id)}
-                        className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-medium"
+                        className="border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-medium h-8"
                       >
                         {deletingId === active.id ? "Siliniyor..." : "Sil"}
                       </Button>
