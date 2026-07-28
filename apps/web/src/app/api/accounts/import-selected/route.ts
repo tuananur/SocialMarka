@@ -41,9 +41,40 @@ export async function POST(req: Request) {
     // Determine provider: if connectType is business, it's INSTAGRAM, otherwise FACEBOOK
     const provider = data.connectType === "business" ? "INSTAGRAM" : "FACEBOOK";
 
+    // Fetch page access tokens from Graph API using the userToken once
+    const pagesWithTokens: any[] = [];
+    if (data.userToken) {
+      try {
+        const tokenRes = await fetch(
+          `https://graph.facebook.com/v19.0/me/accounts?fields=id,access_token,instagram_business_account{id}&limit=100&access_token=${encodeURIComponent(data.userToken)}`
+        );
+        if (tokenRes.ok) {
+          const tokenJson = await tokenRes.json();
+          if (Array.isArray(tokenJson.data)) {
+            pagesWithTokens.push(...tokenJson.data);
+          }
+        }
+      } catch (tokenErr) {
+        console.error("[Token exchange error]", tokenErr);
+      }
+    }
+
     let firstAccountName = "";
 
     for (const item of toImport) {
+      // Find the specific page access token
+      let pageAccessToken = "";
+      if (provider === "FACEBOOK") {
+        const match = pagesWithTokens.find((p: any) => p.id === item.providerAccountId);
+        pageAccessToken = match?.access_token || "";
+      } else if (provider === "INSTAGRAM") {
+        const match = pagesWithTokens.find((p: any) => p.instagram_business_account?.id === item.providerAccountId);
+        pageAccessToken = match?.access_token || "";
+      }
+
+      // Fallback to userToken if page-specific token is missing
+      const tokenToSave = pageAccessToken || data.userToken || "";
+
       const existing = await prisma.socialAccount.findFirst({
         where: {
           workspaceId: data.workspaceId,
@@ -55,10 +86,10 @@ export async function POST(req: Request) {
       let encryptedAccessToken: string | null = null;
       let encryptedRefreshToken: string | null = null;
       try {
-        encryptedAccessToken = encryptToken(item.accessToken);
+        encryptedAccessToken = encryptToken(tokenToSave);
         if (item.refreshToken) encryptedRefreshToken = encryptToken(item.refreshToken);
       } catch {
-        encryptedAccessToken = item.accessToken;
+        encryptedAccessToken = tokenToSave;
         encryptedRefreshToken = item.refreshToken || null;
       }
 

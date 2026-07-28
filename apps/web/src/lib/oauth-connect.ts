@@ -299,7 +299,6 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
   // Çoklu sayfa varsa (Facebook/Instagram) → kullanıcı seçsin
   if (multipleAccounts && multipleAccounts.length > 0) {
     const list = multipleAccounts.map((acc: any) => ({
-      accessToken: acc.accessToken,
       refreshToken: acc.refreshToken || refreshToken,
       expiresIn: acc.expiresIn || expiresIn,
       providerAccountId: acc.providerAccountId,
@@ -309,6 +308,7 @@ export async function handleOAuthCallback(req: Request, providerRaw: string) {
 
     const cookieVal = Buffer.from(JSON.stringify({
       list,
+      userToken: accessToken, // Store the main user token here so we can fetch page tokens on the fly
       workspaceId: parsed.workspaceId,
       userId: parsed.userId,
       connectGroupId,
