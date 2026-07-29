@@ -528,53 +528,152 @@ export function InboxClient({
                     </div>
                   </div>
                   <div className="flex-1 space-y-4 overflow-y-auto p-4 bg-[#fafbfc]/35 dark:bg-ink-50/35">
-                    {active.messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`flex flex-col group max-w-[70%] ${
-                          m.senderType === "AGENT" ? "ml-auto items-end" : "items-start"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {m.senderType === "USER" && (
-                            <button
-                              onClick={() => setReplyingTo({ id: m.id, text: m.messageText })}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-ink-500 hover:text-amber-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
-                            >
-                              Yanıtla
-                            </button>
-                          )}
-                          {m.senderType === "AGENT" && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                              <button
-                                onClick={() => { setEditMode({ id: m.id, text: m.messageText }); setReply(m.messageText); }}
-                                className="text-[10px] text-ink-500 hover:text-blue-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
-                              >
-                                Düzenle
-                              </button>
-                              <button
-                                onClick={() => requestDeleteMessage(m.id)}
-                                className="text-[10px] text-ink-500 hover:text-rose-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
-                              >
-                                Sil
-                              </button>
+                    {active.type === "COMMENT" ? (
+                      /* Comment Thread Layout (YouTube/Instagram style) */
+                      <div className="space-y-6">
+                        {/* Top-Level Comment */}
+                        {active.messages.length > 0 && (() => {
+                          const topMsg = active.messages[0];
+                          return (
+                            <div className="flex gap-3 items-start bg-white p-4 rounded-2xl border border-ink-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+                              <Avatar
+                                src={active.senderAvatar || undefined}
+                                name={active.senderName}
+                                size="sm"
+                                className="ring-2 ring-amber-100"
+                              />
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-ink-900">{active.senderName}</span>
+                                  <span className="text-[10px] text-ink-400 font-medium">
+                                    {new Date(topMsg.createdAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-ink-800 bg-ink-50/50 p-2.5 rounded-xl border border-ink-100/50 mt-1">
+                                  {topMsg.messageText}
+                                </p>
+                                <div className="flex gap-2 pt-1">
+                                  <button
+                                    onClick={() => setReplyingTo({ id: topMsg.id, text: topMsg.messageText })}
+                                    className="text-[10px] text-ink-500 hover:text-amber-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1 flex items-center gap-1 font-medium transition"
+                                  >
+                                    💬 Yanıtla
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          )}
-                          <div
-                            className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                              m.senderType === "AGENT"
-                                ? "bg-slate-700 text-white rounded-tr-none"
-                                : "bg-white border border-ink-100 text-ink-900 rounded-tl-none"
-                            }`}
-                          >
-                            {m.messageText}
+                          );
+                        })()}
+
+                        {/* Indented Replies Section */}
+                        {active.messages.length > 1 && (
+                          <div className="space-y-4 pl-8 border-l-2 border-dashed border-ink-200 ml-4">
+                            <h4 className="text-[11px] font-bold text-ink-400 uppercase tracking-wider mb-2">Yanıtlar</h4>
+                            {active.messages.slice(1).map((m) => (
+                              <div key={m.id} className="flex gap-2.5 items-start bg-white/70 p-3 rounded-xl border border-ink-100/50 relative">
+                                <Avatar
+                                  src={m.senderType === "AGENT" ? active.socialAccount.profilePicUrl || undefined : undefined}
+                                  name={m.senderType === "AGENT" ? active.socialAccount.accountName : active.senderName}
+                                  size="sm"
+                                  className="w-6 h-6 text-[10px]"
+                                />
+                                <div className="flex-1 space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-ink-800">
+                                      {m.senderType === "AGENT" ? active.socialAccount.accountName : active.senderName}
+                                      {m.senderType === "AGENT" && (
+                                        <span className="ml-1.5 text-[9px] bg-slate-900 text-white px-1.5 py-0.2 rounded-full">Kanal</span>
+                                      )}
+                                    </span>
+                                    <span className="text-[9px] text-ink-400 font-medium">
+                                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-ink-700 bg-slate-50 p-2 rounded-lg mt-0.5">
+                                    {m.messageText}
+                                  </p>
+                                  <div className="flex gap-1.5 pt-1">
+                                    {m.senderType === "USER" && (
+                                      <button
+                                        onClick={() => setReplyingTo({ id: m.id, text: m.messageText })}
+                                        className="text-[9px] text-ink-500 hover:text-amber-600 bg-white shadow-sm border border-ink-100 rounded-full px-1.5 py-0.5 font-medium transition"
+                                      >
+                                        Yanıtla
+                                      </button>
+                                    )}
+                                    {m.senderType === "AGENT" && (
+                                      <>
+                                        <button
+                                          onClick={() => { setEditMode({ id: m.id, text: m.messageText }); setReply(m.messageText); }}
+                                          className="text-[9px] text-ink-500 hover:text-blue-600 bg-white shadow-sm border border-ink-100 rounded-full px-1.5 py-0.5 font-medium transition"
+                                        >
+                                          Düzenle
+                                        </button>
+                                        <button
+                                          onClick={() => requestDeleteMessage(m.id)}
+                                          className="text-[9px] text-ink-500 hover:text-rose-600 bg-white shadow-sm border border-ink-100 rounded-full px-1.5 py-0.5 font-medium transition"
+                                        >
+                                          Sil
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                        <span className="mt-1 text-[9px] text-ink-400 font-medium px-1">
-                          {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
+                        )}
                       </div>
-                    ))}
+                    ) : (
+                      /* Direct Message Layout (WhatsApp style bubble timeline) */
+                      active.messages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`flex flex-col group max-w-[70%] ${
+                            m.senderType === "AGENT" ? "ml-auto items-end" : "items-start"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {m.senderType === "USER" && (
+                              <button
+                                onClick={() => setReplyingTo({ id: m.id, text: m.messageText })}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-ink-500 hover:text-amber-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
+                              >
+                                Yanıtla
+                              </button>
+                            )}
+                            {m.senderType === "AGENT" && (
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                <button
+                                  onClick={() => { setEditMode({ id: m.id, text: m.messageText }); setReply(m.messageText); }}
+                                  className="text-[10px] text-ink-500 hover:text-blue-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
+                                >
+                                  Düzenle
+                                </button>
+                                <button
+                                  onClick={() => requestDeleteMessage(m.id)}
+                                  className="text-[10px] text-ink-500 hover:text-rose-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
+                                >
+                                  Sil
+                                </button>
+                              </div>
+                            )}
+                            <div
+                              className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                                m.senderType === "AGENT"
+                                  ? "bg-slate-700 text-white rounded-tr-none"
+                                  : "bg-white border border-ink-100 text-ink-900 rounded-tl-none"
+                              }`}
+                            >
+                              {m.messageText}
+                            </div>
+                          </div>
+                          <span className="mt-1 text-[9px] text-ink-400 font-medium px-1">
+                            {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                   <div className="flex flex-col border-t border-ink-100 bg-white">
                     {(replyingTo || editMode) && (

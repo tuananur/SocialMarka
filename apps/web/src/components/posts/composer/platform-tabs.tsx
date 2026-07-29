@@ -23,16 +23,16 @@ export function PlatformTabs({
             title={p.label}
             disabled={disabled}
             onClick={() => onChange(p.id)}
-            className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm transition ${
+            className={`relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white border border-ink-100 shadow-sm transition ${
               isActive ? "ring-2 ring-amber-400 ring-offset-2" : "opacity-85 hover:opacity-100"
             }`}
           >
             {p.id === "ORIGINAL" ? (
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-700 text-[11px] font-bold text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-white">
                 OR
               </span>
             ) : (
-              <ProviderIcon provider={p.id} size={44} className="rounded-full" />
+              <ProviderIcon provider={p.id} size={22} className="rounded-full" />
             )}
           </button>
         );

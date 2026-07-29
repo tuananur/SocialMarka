@@ -10,8 +10,11 @@ export async function GET(req: Request) {
     const key = url.searchParams.get("key");
     const cronKey = process.env.CRON_SECRET || "socialmarka-cron-default-key";
 
+    const authHeader = req.headers.get("Authorization");
+    const isHeaderAuthed = authHeader === `Bearer ${cronKey}`;
+
     // Basic protection so arbitrary users cannot trigger it repeatedly
-    if (key !== cronKey) {
+    if (key !== cronKey && !isHeaderAuthed) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

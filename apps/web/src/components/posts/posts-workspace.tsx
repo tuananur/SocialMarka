@@ -306,8 +306,8 @@ export function PostsWorkspace({
       const res = await fetch(`/api/posts/${postId}/restore`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Geri yüklenemedi");
-      setMessage("Gönderi geri yüklendi (Taslak olarak kaydedildi).");
-      setListTab("DRAFT");
+      setMessage("Gönderi geri yüklendi ve tekrar yayınlandı.");
+      setListTab("PUBLISHED");
       await refresh();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Geri yüklenemedi");

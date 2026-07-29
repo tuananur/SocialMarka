@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma, SenderType, AccountStatus, InboxType } from "@socialmarka/db";
+import { prisma, SenderType, AccountStatus, InboxType, PostStatus } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { resolveAccessToken, decryptToken, encryptToken, refreshGoogleAccessToken } from "@socialmarka/shared";
 import { getLiveActivities } from "@/lib/inbox-activities";
@@ -513,6 +513,23 @@ export async function POST(_req: Request) {
             }
           );
 
+          if (!yRes.ok) {
+            const yErr = await yRes.json().catch(() => ({}));
+            const reason = yErr.error?.errors?.[0]?.reason || "";
+            const msg = yErr.error?.message || "";
+            if (reason === "videoNotFound" || msg.includes("could not be found") || yRes.status === 404) {
+              await prisma.postTarget.update({
+                where: { id: target.id },
+                data: {
+                  status: "FAILED",
+                  errorMessage: "Bu video YouTube'dan silinmiş.",
+                },
+              });
+              await updatePostStatusIfNeeded(target.postId);
+              debugLogs.push(`[${target.socialAccount.accountName}] YouTube videosu silinmiş olarak işaretlendi.`);
+            }
+          }
+
           if (yRes.ok) {
             const yJson = await yRes.json();
             const items = yJson.items || [];
@@ -630,7 +647,25 @@ export async function POST(_req: Request) {
         for (const cUrl of commentUrls) {
           try {
             const cRes = await fetch(cUrl);
-            const cJson = await cRes.json();
+            if (!cRes.ok) {
+              const errData = await cRes.json().catch(() => ({}));
+              const errMsg = errData.error?.message || "";
+              const errCode = errData.error?.code;
+              if (errMsg.includes("does not exist") || errMsg.includes("Unsupported get request") || errCode === 100 || errCode === 803) {
+                await prisma.postTarget.update({
+                  where: { id: target.id },
+                  data: {
+                    status: "FAILED",
+                    errorMessage: "Bu gönderi platformdan silinmiş.",
+                  },
+                });
+                await updatePostStatusIfNeeded(target.postId);
+                debugLogs.push(`[${target.socialAccount.accountName}] Meta gönderisi silinmiş olarak işaretlendi.`);
+              }
+              continue;
+            }
+
+            const cJson = await cRes.json().catch(() => ({}));
             if (cRes.ok && Array.isArray(cJson.data) && cJson.data.length > 0) {
               debugLogs.push(`Yayınlanan hedef ${target.remotePostId} için ${cJson.data.length} yorum çekildi`);
               for (const comment of cJson.data) {
@@ -725,4 +760,30 @@ export async function POST(_req: Request) {
 
   const activities = await getLiveActivities(ctx.workspaceId);
   return NextResponse.json({ conversations: updatedConversations, debugLogs, activities });
+}
+
+async function updatePostStatusIfNeeded(postId: string) {
+  try {
+    const targets = await prisma.postTarget.findMany({
+      where: { postId },
+    });
+    
+    const total = targets.length;
+    const failed = targets.filter((t) => t.status === "FAILED").length;
+    const published = targets.filter((t) => t.status === "PUBLISHED").length;
+    
+    let newStatus: PostStatus = "PUBLISHED";
+    if (failed === total) {
+      newStatus = "FAILED";
+    } else if (failed > 0) {
+      newStatus = "PARTIAL_FAILED";
+    }
+    
+    await prisma.post.update({
+      where: { id: postId },
+      data: { status: newStatus },
+    });
+  } catch (err) {
+    console.error("updatePostStatusIfNeeded error:", err);
+  }
 }

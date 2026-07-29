@@ -425,24 +425,26 @@ export function ComposerShell({
             </div>
             <div className="flex flex-wrap gap-2">
               {/* Draft split button group */}
-              <div className="relative flex items-center">
+              <div className="relative flex items-center bg-white dark:bg-ink-950 rounded-xl border border-ink-200 dark:border-ink-800 shadow-sm overflow-hidden">
                 <Button
-                  variant="outline"
-                  className="rounded-r-none font-semibold"
+                  variant="light"
+                  className="rounded-r-none font-semibold hover:bg-ink-50 dark:hover:bg-ink-900 border-none h-10"
                   isDisabled={draftDisabled || busy}
                   onPress={onSaveDraft}
                 >
                   {busy ? "Kaydediliyor..." : "Taslak Kaydet"}
                 </Button>
-                <div className="h-10 w-[1px] bg-ink-200 dark:bg-ink-800" />
-                <Button
-                  variant="outline"
-                  className="rounded-l-none px-2.5 font-semibold"
-                  isDisabled={draftDisabled || busy}
-                  onPress={() => setIsSaveDraftMenuOpen(!isSaveDraftMenuOpen)}
+                <div className="h-6 w-[1px] bg-ink-200 dark:bg-ink-800" />
+                <button
+                  type="button"
+                  disabled={draftDisabled || busy}
+                  onClick={() => setIsSaveDraftMenuOpen(!isSaveDraftMenuOpen)}
+                  className="px-2.5 h-10 flex items-center justify-center text-ink-500 hover:text-ink-800 dark:hover:text-white hover:bg-ink-50 dark:hover:bg-ink-900 transition-colors"
                 >
-                  ▲
-                </Button>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </button>
                 {isSaveDraftMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsSaveDraftMenuOpen(false)} />
@@ -464,24 +466,26 @@ export function ComposerShell({
               </div>
 
               {/* Schedule split button group */}
-              <div className="relative flex items-center">
+              <div className="relative flex items-center bg-accent rounded-xl shadow-md shadow-accent/25 hover:opacity-95 transition-all overflow-hidden">
                 <Button
-                  variant="primary"
-                  className="rounded-r-none pr-3 font-semibold shadow-md shadow-accent/20"
+                  variant="light"
+                  className="rounded-r-none pr-3 font-semibold text-white border-none h-10 hover:bg-white/10"
                   isDisabled={scheduleDisabled || busy}
                   onPress={() => setIsScheduleModalOpen(true)}
                 >
                   {busy ? "Zamanlanıyor..." : "📅 Zamanlama Ayarla"}
                 </Button>
-                <div className="h-10 w-[1px] bg-white/30" />
-                <Button
-                  variant="primary"
-                  className="rounded-l-none px-2.5 font-semibold shadow-md shadow-accent/20"
-                  isDisabled={scheduleDisabled || busy}
-                  onPress={() => setIsScheduleMenuOpen(!isScheduleMenuOpen)}
+                <div className="h-6 w-[1px] bg-white/20" />
+                <button
+                  type="button"
+                  disabled={scheduleDisabled || busy}
+                  onClick={() => setIsScheduleMenuOpen(!isScheduleMenuOpen)}
+                  className="px-2.5 h-10 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  ▲
-                </Button>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </button>
                 {isScheduleMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsScheduleMenuOpen(false)} />
