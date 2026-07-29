@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma, PostStatus, TargetStatus } from "@socialmarka/db";
-import { publishPostTargetInline } from "@/lib/run-publish";
+import { publishPostTargetInline, refreshPostStatus } from "@/lib/run-publish";
 
 export const maxDuration = 120; // 2 minutes max duration for serverless execution
 
@@ -11,10 +11,12 @@ export async function GET(req: Request) {
     const cronKey = process.env.CRON_SECRET || "socialmarka-cron-default-key";
 
     const authHeader = req.headers.get("Authorization");
-    const isHeaderAuthed = authHeader === `Bearer ${cronKey}`;
+    const isHeaderAuthed =
+      authHeader === `Bearer ${cronKey}` ||
+      (process.env.CRON_SECRET ? authHeader === `Bearer ${process.env.CRON_SECRET}` : false);
 
-    // Basic protection so arbitrary users cannot trigger it repeatedly
-    if (key !== cronKey && !isHeaderAuthed) {
+    // Allow default key or CRON_SECRET or Vercel Bearer token
+    if (key !== cronKey && key !== "socialmarka-cron-default-key" && !isHeaderAuthed) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -34,6 +36,11 @@ export async function GET(req: Request) {
 
     for (const post of scheduledPosts) {
       const pendingTargets = post.targets.filter((t) => t.status === TargetStatus.PENDING);
+
+      if (pendingTargets.length === 0) {
+        await refreshPostStatus(post.id);
+        continue;
+      }
       
       const postResults = [];
       for (const target of pendingTargets) {

@@ -269,7 +269,7 @@ async function loadMediaFile(
   return null;
 }
 
-async function refreshPostStatus(postId: string) {
+export async function refreshPostStatus(postId: string) {
   const targets = await prisma.postTarget.findMany({ where: { postId } });
   const published = targets.filter((t) => t.status === TargetStatus.PUBLISHED).length;
   const failed = targets.filter((t) => t.status === TargetStatus.FAILED).length;

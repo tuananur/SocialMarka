@@ -46,6 +46,35 @@ export async function GET() {
   const ctx = await getWorkspaceContext();
   if (!ctx) return NextResponse.json({ error: "Oturum gerekli" }, { status: 401 });
 
+  // Auto-process due scheduled posts for this workspace
+  try {
+    const now = new Date();
+    const duePosts = await prisma.post.findMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+        status: PostStatus.SCHEDULED,
+        scheduledAt: { lte: now },
+      },
+      include: { targets: true },
+    });
+
+    if (duePosts.length > 0) {
+      const { publishPostTargetInline } = await import("@/lib/run-publish");
+      for (const post of duePosts) {
+        const pendingTargets = post.targets.filter((t) => t.status === TargetStatus.PENDING);
+        for (const target of pendingTargets) {
+          try {
+            await publishPostTargetInline({ postId: post.id, postTargetId: target.id });
+          } catch (e) {
+            console.error("Auto publish error for target:", target.id, e);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[GET /api/posts] Due posts check error:", e);
+  }
+
   const posts = await prisma.post.findMany({
     where: { workspaceId: ctx.workspaceId },
     include: {
