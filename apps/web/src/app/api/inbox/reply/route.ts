@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 
   // Enqueue as background task fallback
   try {
-    await enqueueInboxReply({ conversationId, messageId: message.id });
+    void enqueueInboxReply({ conversationId, messageId: message.id }).catch(() => {});
   } catch {
     /* ignore queue failures in serverless */
   }

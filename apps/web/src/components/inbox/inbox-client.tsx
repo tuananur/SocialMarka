@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar, Button, Card, Chip, Input } from "@heroui/react";
 import { ProviderIcon } from "../posts/provider-icon";
 
@@ -99,6 +100,7 @@ export function InboxClient({
   initialActivities?: Activity[];
 }) {
   const [conversations, setConversations] = useState(initial);
+  const router = useRouter();
   const [activeId, setActiveId] = useState(initial[0]?.id || null);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
@@ -193,6 +195,7 @@ export function InboxClient({
         )
       );
       setReply("");
+      router.refresh();
     } catch (e) {
       showAlert("Yorum Yanıtı İletilemedi", e instanceof Error ? e.message : "Yanıt gönderilirken bir hata oluştu.");
     } finally {

@@ -13,7 +13,8 @@ function isLocalToken(token: string) {
     token.startsWith("sm_access_") ||
     token.startsWith("stub-") ||
     token.startsWith("demo-") ||
-    token.startsWith("oauth-access-demo")
+    token.startsWith("oauth-access-demo") ||
+    token.startsWith("dummy-")
   );
 }
 
