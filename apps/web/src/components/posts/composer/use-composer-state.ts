@@ -33,6 +33,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
   const [pinLink, setPinLink] = useState("");
   const [pinAlt, setPinAlt] = useState(false);
   const [pinHashtags, setPinHashtags] = useState("");
+  const [ytTitle, setYtTitle] = useState("");
   const [ytPrivacy, setYtPrivacy] = useState<YtPrivacy>("public");
   const [ytTags, setYtTags] = useState("");
   const [ytAdvanceOpen, setYtAdvanceOpen] = useState(false);
