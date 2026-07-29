@@ -51,11 +51,18 @@ export function ConfirmDialog({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-50 ${
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-70 ${
               danger ? "bg-rose-600 hover:bg-rose-700" : "bg-accent hover:bg-accent/90"
             }`}
           >
-            {confirmLabel}
+            {busy ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span>İşleniyor…</span>
+              </>
+            ) : (
+              confirmLabel
+            )}
           </button>
         </div>
       </div>

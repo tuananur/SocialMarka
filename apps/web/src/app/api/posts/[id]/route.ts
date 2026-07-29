@@ -32,7 +32,58 @@ export async function DELETE(_req: Request, { params }: Params) {
     }
   }
 
-  // Yayınlanmış tüm platform gönderilerini ilgili sosyal ağ API'lerinden ve gelen kutusundan sil
+  const { searchParams } = new URL(_req.url);
+  const targetId = searchParams.get("targetId");
+  const permanent = searchParams.get("permanent") === "true";
+
+  // If a specific targetId was requested to be deleted
+  if (targetId) {
+    const target = post.targets.find((t) => t.id === targetId);
+    if (target) {
+      if (target.remotePostId) {
+        try {
+          await prisma.inboxConversation.deleteMany({
+            where: { workspaceId: ctx.workspaceId, remoteId: target.remotePostId },
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (target.status === "PUBLISHED" && target.remotePostId && target.socialAccount) {
+        try {
+          const accessToken = resolveAccessToken(target.socialAccount.encryptedAccessToken);
+          await deleteRemotePost({
+            platform: target.socialAccount.provider,
+            accessToken,
+            remotePostId: target.remotePostId,
+          });
+        } catch (err: any) {
+          console.error(`[DELETE target] ${target.socialAccount.provider} remote deletion error:`, err);
+        }
+      }
+
+      // If post has multiple targets, remove just this target
+      if (post.targets.length > 1) {
+        await prisma.postTarget.delete({
+          where: { id: targetId },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            action: "POST_TARGET_DELETED",
+            details: { postId: id, targetId },
+            userId: ctx.userId,
+            workspaceId: ctx.workspaceId,
+          },
+        });
+
+        return NextResponse.json({ ok: true, targetDeleted: true });
+      }
+    }
+  }
+
+  // Deleting all targets for whole post deletion
   const deletionResults: Array<{ platform: string; remotePostId: string; success: boolean; error?: string }> = [];
   for (const target of post.targets) {
     if (target.remotePostId) {
@@ -69,9 +120,6 @@ export async function DELETE(_req: Request, { params }: Params) {
       }
     }
   }
-
-  const { searchParams } = new URL(_req.url);
-  const permanent = searchParams.get("permanent") === "true";
 
   if (permanent) {
     await prisma.mediaAsset.deleteMany({

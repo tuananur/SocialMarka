@@ -58,7 +58,7 @@ export function PostsWorkspace({
       setAlerts((prev) => prev.filter((a) => a.id !== id));
     }, 8000);
   }
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ postId: string; targetId?: string } | null>(null);
   const [detailPost, setDetailPost] = useState<Post | null>(null);
   const [postSearch, setPostSearch] = useState("");
   const [accountQuery, setAccountQuery] = useState("");
@@ -98,13 +98,18 @@ export function PostsWorkspace({
 
   // Flatten: one card per target so each platform is shown separately
   const flattenedItems = useMemo(() => {
-    const items: { post: Post; targetIndex: number; key: string }[] = [];
+    const items: { post: Post; targetIndex: number; targetId?: string; key: string }[] = [];
     for (const post of filteredPosts) {
       if (post.targets.length <= 1) {
-        items.push({ post, targetIndex: 0, key: post.id });
+        items.push({ post, targetIndex: 0, targetId: post.targets[0]?.id, key: post.id });
       } else {
         for (let i = 0; i < post.targets.length; i++) {
-          items.push({ post, targetIndex: i, key: `${post.id}__t${i}` });
+          items.push({
+            post,
+            targetIndex: i,
+            targetId: post.targets[i]?.id,
+            key: `${post.id}__t${i}`,
+          });
         }
       }
     }
@@ -306,19 +311,22 @@ export function PostsWorkspace({
     }
   }
 
-  function requestDeletePost(postId: string) {
+  function requestDeletePost(postId: string, targetId?: string) {
     if (!canEdit) return;
-    setDeleteConfirmId(postId);
+    setDeleteConfirm({ postId, targetId });
   }
 
   async function confirmDeletePost() {
-    const postId = deleteConfirmId;
-    if (!postId || !canEdit) return;
+    if (!deleteConfirm || !canEdit) return;
+    const { postId, targetId } = deleteConfirm;
     setBusy(true);
     try {
       const post = posts.find((p) => p.id === postId);
       const isPostDeleted = post && (post as any).isDeleted;
-      const url = isPostDeleted ? `/api/posts/${postId}?permanent=true` : `/api/posts/${postId}`;
+      let url = isPostDeleted ? `/api/posts/${postId}?permanent=true` : `/api/posts/${postId}`;
+      if (targetId) {
+        url += (url.includes("?") ? "&" : "?") + `targetId=${targetId}`;
+      }
 
       const res = await fetch(url, { method: "DELETE" });
       const data = await res.json();
@@ -331,14 +339,14 @@ export function PostsWorkspace({
       if (isPostDeleted) {
         addAlert("success", "Gönderi kalıcı olarak silindi.");
       } else {
-        addAlert("success", "Gönderi silindi (Silinenler klasörüne taşındı).");
+        addAlert("success", targetId && post && post.targets.length > 1 ? "Platform gönderisi silindi." : "Gönderi silindi (Silinenler klasörüne taşındı).");
       }
       await refresh();
     } catch (e) {
       addAlert("danger", e instanceof Error ? e.message : "Silinemedi");
     } finally {
       setBusy(false);
-      setDeleteConfirmId(null);
+      setDeleteConfirm(null);
     }
   }
 
@@ -491,16 +499,20 @@ export function PostsWorkspace({
           composer={composer}
         />
         <ConfirmDialog
-          open={!!deleteConfirmId}
+          open={!!deleteConfirm}
           title="Gönderiyi sil"
-          description="Bu gönderi kalıcı olarak silinecek. Bu işlem geri alınamaz."
+          description={
+            deleteConfirm?.targetId
+              ? "Bu platform gönderisi silinecek. Emin misiniz?"
+              : "Bu gönderi silinecek. Emin misiniz?"
+          }
           confirmLabel="Evet, sil"
           danger
           busy={busy}
           onConfirm={() => void confirmDeletePost()}
-          onCancel={() => setDeleteConfirmId(null)}
+          onCancel={() => setDeleteConfirm(null)}
         />
-        {busy && (
+        {busy && !deleteConfirm && (
           <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-ink-950/60">
             <div className="flex items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-xl dark:bg-ink-900 border border-ink-100 dark:border-ink-800">
                <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-accent border-t-transparent"></div>
@@ -604,7 +616,7 @@ export function PostsWorkspace({
             ) : null}
           </div>
         ) : null}
-        {flattenedItems.map(({ post, targetIndex, key }) => (
+        {flattenedItems.map(({ post, targetIndex, targetId, key }) => (
           <PostManageCard
             key={key}
             post={post}
@@ -612,7 +624,7 @@ export function PostsWorkspace({
             targetIndex={post.targets.length > 1 ? targetIndex : undefined}
             onOpen={() => setDetailPost(post)}
             onEdit={() => openEdit(post)}
-            onDelete={() => requestDeletePost(post.id)}
+            onDelete={(tId) => requestDeletePost(post.id, tId || targetId)}
             onRetry={
               canEdit &&
               (post.status === "FAILED" ||
@@ -660,16 +672,20 @@ export function PostsWorkspace({
       ) : null}
 
       <ConfirmDialog
-        open={!!deleteConfirmId}
+        open={!!deleteConfirm}
         title="Gönderiyi sil"
-        description="Bu gönderi kalıcı olarak silinecek. Bu işlem geri alınamaz."
+        description={
+          deleteConfirm?.targetId
+            ? "Bu platform gönderisi silinecek. Emin misiniz?"
+            : "Bu gönderi silinecek. Emin misiniz?"
+        }
         confirmLabel="Evet, sil"
         danger
         busy={busy}
         onConfirm={() => void confirmDeletePost()}
-        onCancel={() => setDeleteConfirmId(null)}
+        onCancel={() => setDeleteConfirm(null)}
       />
-      {busy && (
+      {busy && !deleteConfirm && (
         <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-ink-950/60">
           <div className="flex items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-xl dark:bg-ink-900 border border-ink-100 dark:border-ink-800">
              <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-accent border-t-transparent"></div>

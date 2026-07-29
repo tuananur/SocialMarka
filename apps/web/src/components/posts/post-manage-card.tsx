@@ -27,9 +27,9 @@ export function PostManageCard({
   targetIndex?: number;
   onOpen: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete: (targetId?: string) => void;
   onRetry?: () => void;
-  onRestore?: () => void;
+  onRestore?: (targetId?: string) => void;
 }) {
   const thumb = postThumbnail(post);
   const isVideo = postIsVideo(post);
@@ -122,7 +122,7 @@ export function PostManageCard({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRestore();
+                  onRestore(displayTargets[0]?.id);
                 }}
                 className="rounded-lg px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
               >
@@ -132,7 +132,7 @@ export function PostManageCard({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete();
+                  onDelete(displayTargets[0]?.id);
                 }}
                 className="rounded-lg px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
               >
@@ -169,7 +169,7 @@ export function PostManageCard({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete();
+                  onDelete(displayTargets[0]?.id);
                 }}
                 className="rounded-lg px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
               >
