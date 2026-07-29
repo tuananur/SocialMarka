@@ -597,7 +597,7 @@ export function InboxClient({
                             }`}
                             onPress={() => handleThankActivity(act.id)}
                           >
-                            {act.thanked ? "✓ Teşekkür Edildi" : "Teşekkür Et"}
+                            {act.thanked ? "✓ Yorum Beğenildi" : "Yorumu Beğen"}
                           </Button>
                         )}
                         {act.type === "FOLLOW" && (

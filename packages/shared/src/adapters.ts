@@ -300,6 +300,9 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
       conversationRemoteId: string;
       message: string;
     }) {
+      if (isLocalToken(params.accessToken)) {
+        return { success: true };
+      }
       try {
         if (platform === "YOUTUBE") {
           const res = await fetch(`https://www.googleapis.com/youtube/v3/comments?part=snippet`, {
