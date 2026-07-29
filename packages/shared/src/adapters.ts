@@ -300,10 +300,6 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
       accessToken: string;
       conversationRemoteId: string;
       message: string;
-    async sendInboxReply(params: {
-      accessToken: string;
-      conversationRemoteId: string;
-      message: string;
     }) {
       if (isLocalToken(params.accessToken)) {
         return { success: true, remoteMessageId: "local-" + Date.now() };
