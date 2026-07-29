@@ -3,13 +3,17 @@ import { prisma, SenderType } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { getPlatformAdapter, decryptToken } from "@socialmarka/shared";
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+type Params = { params: Promise<{ id: string }> };
+
+export async function DELETE(req: Request, { params }: Params) {
   const ctx = await getWorkspaceContext();
   if (!ctx) return NextResponse.json({ error: "Oturum gerekli" }, { status: 401 });
   if (!canEditContent(ctx.role)) return NextResponse.json({ error: "Yetkiniz yok" }, { status: 403 });
 
+  const { id } = await params;
+
   const message = await prisma.inboxMessage.findFirst({
-    where: { id: params.id, conversation: { workspaceId: ctx.workspaceId } },
+    where: { id, conversation: { workspaceId: ctx.workspaceId } },
     include: { conversation: { include: { socialAccount: true } } },
   });
 
@@ -40,7 +44,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   return NextResponse.json({ success: true });
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: Params) {
   const ctx = await getWorkspaceContext();
   if (!ctx) return NextResponse.json({ error: "Oturum gerekli" }, { status: 401 });
   if (!canEditContent(ctx.role)) return NextResponse.json({ error: "Yetkiniz yok" }, { status: 403 });
@@ -49,8 +53,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const text = String(body.message || "").trim();
   if (!text) return NextResponse.json({ error: "Mesaj boş olamaz" }, { status: 400 });
 
+  const { id } = await params;
+
   const message = await prisma.inboxMessage.findFirst({
-    where: { id: params.id, conversation: { workspaceId: ctx.workspaceId } },
+    where: { id, conversation: { workspaceId: ctx.workspaceId } },
     include: { conversation: { include: { socialAccount: true } } },
   });
 
