@@ -444,7 +444,7 @@ export function ComposerShell({
               {/* Draft split button group */}
               <div className="relative flex items-center bg-white dark:bg-ink-950 rounded-xl border border-ink-200 dark:border-ink-800 shadow-sm overflow-hidden">
                 <Button
-                  variant="light"
+                  variant="ghost"
                   className="rounded-r-none font-semibold hover:bg-ink-50 dark:hover:bg-ink-900 border-none h-10"
                   isDisabled={draftDisabled || busy}
                   onPress={onSaveDraft}
@@ -485,7 +485,7 @@ export function ComposerShell({
               {/* Schedule split button group */}
               <div className="relative flex items-center bg-accent rounded-xl shadow-md shadow-accent/25 hover:opacity-95 transition-all overflow-hidden">
                 <Button
-                  variant="light"
+                  variant="primary"
                   className="rounded-r-none pr-3 font-semibold text-white border-none h-10 hover:bg-white/10"
                   isDisabled={scheduleDisabled || busy}
                   onPress={() => setIsScheduleModalOpen(true)}
