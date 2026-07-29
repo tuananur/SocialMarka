@@ -42,7 +42,7 @@ export function PlatformFields({
     return (
       <div className="mb-3 space-y-3">
         <div>
-          <label className="mb-1 block text-xs font-semibold text-ink-500">
+          <label className="mb-1 block text-xs font-bold text-ink-800">
             Hedef link (Destination)
           </label>
           <Input
@@ -54,7 +54,7 @@ export function PlatformFields({
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-semibold text-ink-500">
+          <label className="mb-1 block text-xs font-bold text-ink-800">
             Başlık (zorunlu, max 100)
           </label>
           <div className="relative">
@@ -64,7 +64,7 @@ export function PlatformFields({
               onChange={(e) => setPinTitle(e.target.value.slice(0, 100))}
               disabled={!canEdit}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-ink-400">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-ink-600">
               {pinTitle.length}/100
             </span>
           </div>
@@ -72,7 +72,7 @@ export function PlatformFields({
         
         {/* Pinterest Hashtags Section */}
         <div>
-          <label className="mb-1 block text-xs font-semibold text-ink-500 dark:text-ink-400">
+          <label className="mb-1 block text-xs font-bold text-ink-800">
             Hashtagler (Boşluklarla ayırın)
           </label>
           <Input

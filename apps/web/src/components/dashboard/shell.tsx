@@ -80,17 +80,17 @@ export function DashboardShell({
               SM
             </span>
             <span className="min-w-0">
-              <span className="block truncate font-display text-base font-medium tracking-tight text-ink-900 dark:text-white">
+              <span className="block truncate font-display text-base font-semibold tracking-tight text-ink-900">
                 SocialMarka
               </span>
-              <span className="block truncate text-[11px] text-ink-400">
+              <span className="block truncate text-[11px] font-medium text-ink-600">
                 {user.workspaceName}
               </span>
             </span>
           </Link>
           <button
             type="button"
-            className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50 dark:hover:bg-slate-800 md:hidden"
+            className="rounded-lg p-1.5 text-ink-600 hover:bg-ink-50 dark:hover:bg-slate-800 md:hidden"
             onClick={() => setMobileOpen(false)}
             aria-label="Kapat"
           >
@@ -108,13 +108,13 @@ export function DashboardShell({
                 className={`block rounded-xl px-3 py-2.5 transition ${
                   active
                     ? "bg-accent text-white shadow-sm shadow-accent/20"
-                    : "text-ink-600 dark:text-slate-300 hover:bg-ink-50 dark:hover:bg-slate-800 hover:text-ink-900 dark:hover:text-white"
+                    : "text-ink-700 font-medium hover:bg-ink-50 hover:text-ink-900"
                 }`}
               >
-                <span className="block text-sm font-medium leading-none">{item.label}</span>
+                <span className="block text-sm font-semibold leading-none">{item.label}</span>
                 <span
                   className={`mt-1 block text-[11px] ${
-                    active ? "text-white/75" : "text-ink-400 dark:text-slate-500"
+                    active ? "text-white/85" : "text-ink-500 font-medium"
                   }`}
                 >
                   {item.hint}
@@ -143,8 +143,8 @@ export function DashboardShell({
               <MenuIcon />
             </button>
             <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-ink-800">{pageLabel}</div>
-              <div className="hidden truncate text-[11px] text-ink-400 sm:block">
+              <div className="truncate text-sm font-bold text-ink-900">{pageLabel}</div>
+              <div className="hidden truncate text-[11px] font-medium text-ink-600 sm:block">
                 {user.workspaceName}
               </div>
             </div>
@@ -152,10 +152,10 @@ export function DashboardShell({
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <div className="hidden text-right sm:block">
-              <div className="max-w-[10rem] truncate text-sm font-medium text-ink-800">
+              <div className="max-w-[10rem] truncate text-sm font-semibold text-ink-900">
                 {user.name || "Kullanıcı"}
               </div>
-              <div className="max-w-[10rem] truncate text-[11px] text-ink-400">{user.email}</div>
+              <div className="max-w-[10rem] truncate text-[11px] font-medium text-ink-600">{user.email}</div>
             </div>
             {user.image ? (
               // eslint-disable-next-line @next/next/no-img-element
