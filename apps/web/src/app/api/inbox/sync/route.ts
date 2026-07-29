@@ -81,7 +81,10 @@ export async function POST(_req: Request) {
                     if (!msgItem.message) continue;
                     const isAgent = msgItem.from?.id === account.providerAccountId;
                     const existingMsg = await prisma.inboxMessage.findFirst({
-                      where: { conversationId: conversation.id, messageText: msgItem.message },
+                      where: {
+                        conversationId: conversation.id,
+                        ...(msgItem.id ? { remoteId: msgItem.id } : { messageText: msgItem.message }),
+                      },
                     });
                     if (!existingMsg) {
                       await prisma.inboxMessage.create({
@@ -179,7 +182,10 @@ export async function POST(_req: Request) {
                     }
 
                     const existingMsg = await prisma.inboxMessage.findFirst({
-                      where: { conversationId: conversation.id, messageText: commentText },
+                      where: {
+                        conversationId: conversation.id,
+                        ...(comment.id ? { remoteId: comment.id } : { messageText: commentText }),
+                      },
                     });
                     if (!existingMsg) {
                       await prisma.inboxMessage.create({
@@ -249,7 +255,10 @@ export async function POST(_req: Request) {
                         }
 
                         const existingMsg = await prisma.inboxMessage.findFirst({
-                          where: { conversationId: conversation.id, messageText: commentText },
+                          where: {
+                            conversationId: conversation.id,
+                            ...(comment.id ? { remoteId: comment.id } : { messageText: commentText }),
+                          },
                         });
                         if (!existingMsg) {
                           await prisma.inboxMessage.create({
@@ -338,7 +347,7 @@ export async function POST(_req: Request) {
           if (!videoId) continue;
 
           const commentRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=100&access_token=${accessToken}`
+            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=100&access_token=${accessToken}`
           );
           if (!commentRes.ok) {
             continue;
@@ -396,7 +405,10 @@ export async function POST(_req: Request) {
             }
 
             const existingMsg = await prisma.inboxMessage.findFirst({
-              where: { conversationId: conversation.id, messageText: commentText },
+              where: {
+                conversationId: conversation.id,
+                ...(remoteId ? { remoteId } : { messageText: commentText }),
+              },
             });
             if (!existingMsg) {
               await prisma.inboxMessage.create({
@@ -408,6 +420,35 @@ export async function POST(_req: Request) {
                   createdAt,
                 },
               });
+            }
+
+            // Process YouTube replies
+            const replies = item.replies?.comments || [];
+            for (const reply of replies) {
+              const replySnippet = reply.snippet;
+              if (!replySnippet) continue;
+              const replySender = replySnippet.authorDisplayName || "youtube_user";
+              const replyText = replySnippet.textOriginal || replySnippet.textDisplay || "";
+              const replyRemoteId = reply.id;
+              const replyCreatedAt = replySnippet.publishedAt ? new Date(replySnippet.publishedAt) : new Date();
+
+              const existingReplyMsg = await prisma.inboxMessage.findFirst({
+                where: {
+                  conversationId: conversation.id,
+                  ...(replyRemoteId ? { remoteId: replyRemoteId } : { messageText: replyText }),
+                },
+              });
+              if (!existingReplyMsg) {
+                await prisma.inboxMessage.create({
+                  data: {
+                    conversationId: conversation.id,
+                    senderType: replySender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                    messageText: replyText,
+                    remoteId: replyRemoteId,
+                    createdAt: replyCreatedAt,
+                  },
+                });
+              }
             }
           }
         }
@@ -462,7 +503,7 @@ export async function POST(_req: Request) {
           }
 
           const yRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${encodeURIComponent(target.remotePostId)}&maxResults=100`,
+            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${encodeURIComponent(target.remotePostId)}&maxResults=100`,
             {
               headers: { Authorization: `Bearer ${accessToken}` }
             }
@@ -519,7 +560,10 @@ export async function POST(_req: Request) {
               }
 
               const existingMsg = await prisma.inboxMessage.findFirst({
-                where: { conversationId: conversation.id, messageText: commentText },
+                where: {
+                  conversationId: conversation.id,
+                  ...(remoteId ? { remoteId } : { messageText: commentText }),
+                },
               });
               if (!existingMsg) {
                 await prisma.inboxMessage.create({
@@ -531,6 +575,35 @@ export async function POST(_req: Request) {
                     createdAt,
                   },
                 });
+              }
+
+              // Process YouTube replies for PostTarget comments
+              const replies = item.replies?.comments || [];
+              for (const reply of replies) {
+                const replySnippet = reply.snippet;
+                if (!replySnippet) continue;
+                const replySender = replySnippet.authorDisplayName || "youtube_user";
+                const replyText = replySnippet.textOriginal || replySnippet.textDisplay || "";
+                const replyRemoteId = reply.id;
+                const replyCreatedAt = replySnippet.publishedAt ? new Date(replySnippet.publishedAt) : new Date();
+
+                const existingReplyMsg = await prisma.inboxMessage.findFirst({
+                  where: {
+                    conversationId: conversation.id,
+                    ...(replyRemoteId ? { remoteId: replyRemoteId } : { messageText: replyText }),
+                  },
+                });
+                if (!existingReplyMsg) {
+                  await prisma.inboxMessage.create({
+                    data: {
+                      conversationId: conversation.id,
+                      senderType: replySender.toLowerCase() === target.socialAccount.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                      messageText: replyText,
+                      remoteId: replyRemoteId,
+                      createdAt: replyCreatedAt,
+                    },
+                  });
+                }
               }
             }
           } else {
@@ -584,7 +657,10 @@ export async function POST(_req: Request) {
                 }
 
                 const existingMsg = await prisma.inboxMessage.findFirst({
-                  where: { conversationId: conversation.id, messageText: commentText },
+                  where: {
+                    conversationId: conversation.id,
+                    ...(comment.id ? { remoteId: comment.id } : { messageText: commentText }),
+                  },
                 });
                 if (!existingMsg) {
                   await prisma.inboxMessage.create({

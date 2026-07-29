@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
-import { getPlatformAdapter, decryptToken } from "@socialmarka/shared";
+import { getPlatformAdapter } from "@socialmarka/shared";
+import { getFreshAccessToken } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const ctx = await getWorkspaceContext();
@@ -30,8 +31,10 @@ export async function POST(req: Request) {
     const adapter = getPlatformAdapter(account.provider);
     if (adapter.likeInboxItem) {
       let accessToken = "stub-token";
-      if (account.encryptedAccessToken) {
-        accessToken = decryptToken(account.encryptedAccessToken);
+      try {
+        accessToken = await getFreshAccessToken(account.id);
+      } catch (err: any) {
+        apiError = err?.message || "Token yenileme hatası";
       }
       try {
         const result = await adapter.likeInboxItem({

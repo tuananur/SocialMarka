@@ -304,6 +304,37 @@ export function InboxClient({
     }
   }
 
+  function requestDeleteMessage(id: string) {
+    setModalConfig({
+      isOpen: true,
+      title: "Cevabı Sil",
+      description: "Bu cevabı ve varsa platform üzerindeki yorum yanıtını silmek istediğinize emin misiniz?",
+      type: "danger",
+      confirmText: "Evet, Sil",
+      onConfirm: () => executeDeleteMessage(id),
+    });
+  }
+
+  async function executeDeleteMessage(id: string) {
+    try {
+      const res = await fetch(`/api/inbox/message/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? { ...c, messages: c.messages.filter((m) => m.id !== id) }
+              : c
+          )
+        );
+      } else {
+        showAlert("Silme İşlemi Başarısız", data.error || "Silme işlemi sırasında bir hata oluştu.");
+      }
+    } catch (err: any) {
+      showAlert("Silme Hatası", err?.message || "Silme hatası oluştu.");
+    }
+  }
+
   return (
     <div className="min-w-0 space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -522,11 +553,7 @@ export function InboxClient({
                                 Düzenle
                               </button>
                               <button
-                                onClick={async () => {
-                                  if (!confirm("Bu mesajı silmek istediğinize emin misiniz?")) return;
-                                  await fetch(`/api/inbox/message/${m.id}`, { method: "DELETE" });
-                                  setConversations((prev) => prev.map(c => c.id === active.id ? { ...c, messages: c.messages.filter(msg => msg.id !== m.id) } : c));
-                                }}
+                                onClick={() => requestDeleteMessage(m.id)}
                                 className="text-[10px] text-ink-500 hover:text-rose-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
                               >
                                 Sil

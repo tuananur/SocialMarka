@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma, SenderType } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
 import { enqueueInboxReply } from "@socialmarka/queue";
-import { getPlatformAdapter, decryptToken } from "@socialmarka/shared";
+import { getPlatformAdapter } from "@socialmarka/shared";
+import { getFreshAccessToken } from "@/lib/tokens";
 
 export async function POST(req: Request) {
   const ctx = await getWorkspaceContext();
@@ -43,10 +44,7 @@ export async function POST(req: Request) {
   let sentRemoteId: string | undefined = undefined;
   try {
     const account = conversation.socialAccount;
-    let accessToken = "stub-token";
-    if (account.encryptedAccessToken) {
-      accessToken = decryptToken(account.encryptedAccessToken);
-    }
+    const accessToken = await getFreshAccessToken(account.id);
 
     const adapter = getPlatformAdapter(account.provider);
     if (adapter.sendInboxReply) {

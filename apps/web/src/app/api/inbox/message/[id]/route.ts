@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma, SenderType } from "@socialmarka/db";
 import { getWorkspaceContext, canEditContent } from "@/lib/rbac";
-import { getPlatformAdapter, decryptToken } from "@socialmarka/shared";
+import { getPlatformAdapter } from "@socialmarka/shared";
+import { getFreshAccessToken } from "@/lib/tokens";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -25,11 +26,8 @@ export async function DELETE(req: Request, { params }: Params) {
     const account = message.conversation.socialAccount;
     const adapter = getPlatformAdapter(account.provider);
     if (adapter.deleteInboxReply) {
-      let accessToken = "stub-token";
-      if (account.encryptedAccessToken) {
-        accessToken = decryptToken(account.encryptedAccessToken);
-      }
       try {
+        const accessToken = await getFreshAccessToken(account.id);
         await adapter.deleteInboxReply({
           accessToken,
           remoteMessageId: message.remoteId,
@@ -68,11 +66,8 @@ export async function PUT(req: Request, { params }: Params) {
     const account = message.conversation.socialAccount;
     const adapter = getPlatformAdapter(account.provider);
     if (adapter.editInboxReply) {
-      let accessToken = "stub-token";
-      if (account.encryptedAccessToken) {
-        accessToken = decryptToken(account.encryptedAccessToken);
-      }
       try {
+        const accessToken = await getFreshAccessToken(account.id);
         await adapter.editInboxReply({
           accessToken,
           remoteMessageId: message.remoteId,
