@@ -14,6 +14,8 @@ export function PlatformFields({
   setPinAlt,
   pinHashtags = "",
   setPinHashtags = () => {},
+  ytTitle = "",
+  setYtTitle = () => {},
   ytPrivacy,
   setYtPrivacy,
   ytTags,
@@ -31,6 +33,8 @@ export function PlatformFields({
   setPinAlt: (v: boolean) => void;
   pinHashtags?: string;
   setPinHashtags?: (v: string) => void;
+  ytTitle?: string;
+  setYtTitle?: (v: string) => void;
   ytPrivacy: YtPrivacy;
   setYtPrivacy: (v: YtPrivacy) => void;
   ytTags: string;
@@ -160,9 +164,40 @@ export function PlatformFields({
 
   if (activePlatform === "YOUTUBE") {
     return (
-      <div className="mt-3 space-y-3">
+      <div className="mb-3 space-y-3">
         <div>
-          <p className="mb-2 text-xs font-semibold text-ink-500">Gizlilik durumu</p>
+          <label className="mb-1 block text-xs font-bold text-ink-800">
+            Video Başlığı * (max 100)
+          </label>
+          <div className="relative">
+            <Input
+              fullWidth
+              value={ytTitle}
+              onChange={(e) => setYtTitle(e.target.value.slice(0, 100))}
+              placeholder="Video başlığını girin..."
+              disabled={!canEdit}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-ink-600">
+              {ytTitle.length}/100
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-bold text-ink-800">
+            Video Altyazıları
+          </label>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
+            disabled={!canEdit}
+          >
+            <span className="text-sm font-bold">+</span> Altyazı Dosyası Ekle (Add File)
+          </button>
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-bold text-ink-800">Gizlilik durumu</p>
           <div className="flex flex-wrap gap-3 text-sm">
             {(
               [
@@ -171,7 +206,7 @@ export function PlatformFields({
                 { id: "unlisted" as const, label: "Liste dışı" },
               ]
             ).map((o) => (
-              <label key={o.id} className="flex items-center gap-1.5">
+              <label key={o.id} className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-ink-700">
                 <input
                   type="radio"
                   name="ytPrivacy"
@@ -184,6 +219,7 @@ export function PlatformFields({
             ))}
           </div>
         </div>
+
         <div className="rounded-xl border border-ink-200 bg-[#fafbfc] dark:bg-ink-50 dark:border-ink-800">
           <button
             type="button"

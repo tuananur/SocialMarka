@@ -125,6 +125,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
     setPinLink("");
     setPinAlt(false);
     setPinHashtags("");
+    setYtTitle("");
     setYtPrivacy("public");
     setYtTags("");
     setYtAdvanceOpen(false);
@@ -167,7 +168,10 @@ export function useComposerState(accounts: ComposerAccount[]) {
           setYtPrivacy(privacy[1].toLowerCase() as YtPrivacy);
         }
         const title = raw.match(/Başlık:\s*(.+)/i);
-        if (title && provider === "PINTEREST") setPinTitle(title[1].trim().slice(0, 100));
+        if (title) {
+          if (provider === "PINTEREST") setPinTitle(title[1].trim().slice(0, 100));
+          if (provider === "YOUTUBE") setYtTitle(title[1].trim().slice(0, 100));
+        }
         const link = raw.match(/Link:\s*(.+)/i);
         if (link && provider === "PINTEREST") setPinLink(link[1].trim());
         if (/Alt text:\s*açık/i.test(raw) && provider === "PINTEREST") setPinAlt(true);
@@ -262,6 +266,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
       pinLink,
       pinAlt,
       pinHashtags,
+      ytTitle,
       ytPrivacy,
       ytTags,
       selectedProviders: providers,
@@ -292,6 +297,7 @@ export function useComposerState(accounts: ComposerAccount[]) {
     mediaItems,
     postFormats,
     pinTitle,
+    ytTitle,
     scheduledAtIso: fromDatetimeLocalValue(scheduledAt),
   };
 
@@ -332,6 +338,8 @@ export function useComposerState(accounts: ComposerAccount[]) {
     setPinAlt,
     pinHashtags,
     setPinHashtags,
+    ytTitle,
+    setYtTitle,
     ytPrivacy,
     setYtPrivacy,
     ytTags,

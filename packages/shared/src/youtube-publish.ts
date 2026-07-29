@@ -26,11 +26,21 @@ export function parseYouTubeContent(content: string): {
       .trim();
   }
 
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const title = (lines[0] || "SocialMarka Video").slice(0, 100);
+  let title = "";
+  const titleMatch = text.match(/Başlık:\s*(.+)/i);
+  if (titleMatch) {
+    title = titleMatch[1].trim().slice(0, 100);
+    text = text.replace(/\n*\s*Başlık:\s*.+$/gim, "").trim();
+  }
+
+  if (!title) {
+    const lines = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    title = (lines[0] || "SocialMarka Video").slice(0, 100);
+  }
+
   const description = text.slice(0, 5000) || title;
 
   return { title, description, privacyStatus };

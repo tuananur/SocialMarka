@@ -70,6 +70,7 @@ export type PreflightInput = {
   mediaItems: MediaItem[];
   postFormats: Partial<Record<"FACEBOOK" | "INSTAGRAM", PostFormat>>;
   pinTitle: string;
+  ytTitle?: string;
   asDraft?: boolean;
   shareNow?: boolean;
   scheduledAtIso?: string | null;
@@ -111,6 +112,7 @@ export function buildPlatformContents(opts: {
   pinLink: string;
   pinAlt: boolean;
   pinHashtags?: string;
+  ytTitle?: string;
   ytPrivacy: YtPrivacy;
   ytTags: string;
   selectedProviders: string[];
@@ -141,10 +143,14 @@ export function buildPlatformContents(opts: {
     }
 
     if (provider === "YOUTUBE") {
-      base = `${stripComposerMarkers(base)}\n\n[Gizlilik]: ${opts.ytPrivacy}`;
+      let desc = stripComposerMarkers(base);
+      const bits = [desc];
+      if (opts.ytTitle) bits.unshift(`Başlık: ${opts.ytTitle}`);
+      bits.push(`[Gizlilik]: ${opts.ytPrivacy}`);
       if (opts.ytTags.trim()) {
-        base += `\n[Etiketler]: ${opts.ytTags.trim()}`;
+        bits.push(`[Etiketler]: ${opts.ytTags.trim()}`);
       }
+      base = bits.filter(Boolean).join("\n");
     }
 
     out[provider] = base;

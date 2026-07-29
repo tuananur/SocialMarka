@@ -326,7 +326,14 @@ export function ComposerShell({
                   0,
                   maxFiles - composer.mediaItems.length,
                 );
-                if (files.length) void onUploadFiles(files);
+                if (files.length) {
+                  const cleanName = files[0].name.replace(/\.[^/.]+$/, "");
+                  if (cleanName) {
+                    if (!composer.ytTitle) composer.setYtTitle(cleanName.slice(0, 100));
+                    if (!composer.pinTitle) composer.setPinTitle(cleanName.slice(0, 100));
+                  }
+                  void onUploadFiles(files);
+                }
               }}
               onClick={() => {
                 if (!canEdit || busy) return;
@@ -365,7 +372,14 @@ export function ComposerShell({
                 0,
                 maxFiles - composer.mediaItems.length,
               );
-              if (files.length) void onUploadFiles(files);
+              if (files.length) {
+                const cleanName = files[0].name.replace(/\.[^/.]+$/, "");
+                if (cleanName) {
+                  if (!composer.ytTitle) composer.setYtTitle(cleanName.slice(0, 100));
+                  if (!composer.pinTitle) composer.setPinTitle(cleanName.slice(0, 100));
+                }
+                void onUploadFiles(files);
+              }
               e.target.value = "";
             }}
           />
@@ -381,6 +395,8 @@ export function ComposerShell({
             setPinAlt={composer.setPinAlt}
             pinHashtags={composer.pinHashtags}
             setPinHashtags={composer.setPinHashtags}
+            ytTitle={composer.ytTitle}
+            setYtTitle={composer.setYtTitle}
             ytPrivacy={composer.ytPrivacy}
             setYtPrivacy={composer.setYtPrivacy}
             ytTags={composer.ytTags}
