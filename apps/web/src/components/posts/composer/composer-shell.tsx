@@ -17,8 +17,8 @@ type RightTab = "accounts" | "comments" | "preview";
 export function ComposerShell({
   canEdit,
   busy,
-  message,
-  onDismissMessage,
+  alerts,
+  onDismissAlert,
   onClose,
   onDelete,
   onSaveDraft,
@@ -42,8 +42,8 @@ export function ComposerShell({
 }: {
   canEdit: boolean;
   busy: boolean;
-  message: string | null;
-  onDismissMessage: () => void;
+  alerts: { id: string; type: "success" | "danger" | "warning"; message: string }[];
+  onDismissAlert: (id: string) => void;
   onClose: () => void;
   onDelete?: () => void;
   onSaveDraft: () => void;
@@ -250,12 +250,29 @@ export function ComposerShell({
         </div>
       </div>
 
-      {message ? (
-        <div className="border-b border-brand-100 bg-brand-50 px-4 py-2 text-sm text-ink-700">
-          {message}
-          <button type="button" className="ml-3 text-accent underline" onClick={onDismissMessage}>
-            Kapat
-          </button>
+      {alerts && alerts.length > 0 ? (
+        <div className="border-b border-ink-200/50 bg-ink-50/50 p-3 space-y-1.5">
+          {alerts.map((a) => (
+            <div
+              key={a.id}
+              className={`px-4 py-2 rounded-xl text-sm border flex justify-between items-center ${
+                a.type === "success"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : a.type === "danger"
+                    ? "bg-rose-50 border-rose-200 text-rose-800"
+                    : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}
+            >
+              <span>{a.message}</span>
+              <button
+                type="button"
+                className="text-xs opacity-60 hover:opacity-100 font-bold ml-3"
+                onClick={() => onDismissAlert(a.id)}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
         </div>
       ) : null}
 

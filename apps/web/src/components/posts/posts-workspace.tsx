@@ -49,7 +49,15 @@ export function PostsWorkspace({
   const [mode, setMode] = useState<"list" | "compose">("list");
   const [listTab, setListTab] = useState("SCHEDULED");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<{ id: string; type: "success" | "danger" | "warning"; message: string }[]>([]);
+
+  function addAlert(type: "success" | "danger" | "warning", message: string) {
+    const id = Math.random().toString();
+    setAlerts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 8000);
+  }
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [detailPost, setDetailPost] = useState<Post | null>(null);
   const [postSearch, setPostSearch] = useState("");
@@ -170,11 +178,10 @@ export function PostsWorkspace({
     if (!canEdit || busy) return;
     const issues = composer.validateForSave(opts);
     if (issues.length) {
-      setMessage(issues[0].message);
+      addAlert("danger", issues[0].message);
       return;
     }
     setBusy(true);
-    setMessage(null);
     try {
       const body = composer.buildApiPayload(opts);
       const res = await fetch("/api/posts", {
@@ -188,18 +195,31 @@ export function PostsWorkspace({
       const savedStatus = String(
         data.post?.status || (opts.asDraft ? "DRAFT" : "SCHEDULED"),
       );
-      setMessage(
-        formatResultsMessage(
-          data,
-          opts.asDraft ? "draft" : opts.shareNow ? "share" : "schedule",
-        ),
-      );
+
+      if (opts.asDraft) {
+        addAlert("success", "Gönderi taslak olarak başarıyla kaydedildi.");
+      } else if (opts.shareNow) {
+        if (data.results && Array.isArray(data.results)) {
+          for (const r of data.results) {
+            if (r.success) {
+              addAlert("success", `${r.accountName || r.provider} hesabında paylaşım başarılı.`);
+            } else {
+              addAlert("danger", `${r.accountName || r.provider} hesabında paylaşım başarısız: ${r.error || "Bilinmeyen hata"}`);
+            }
+          }
+        } else {
+          addAlert("success", "Gönderi başarıyla paylaşıldı.");
+        }
+      } else {
+        addAlert("success", "Gönderi başarıyla zamanlandı.");
+      }
+
       composer.resetCompose();
       setMode("list");
       setListTab(listTabForStatus(savedStatus));
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Hata oluştu");
+      addAlert("danger", e instanceof Error ? e.message : "Kayıt sırasında hata oluştu");
     } finally {
       setBusy(false);
     }
@@ -246,16 +266,26 @@ export function PostsWorkspace({
 
   async function shareNow(postId: string) {
     setBusy(true);
-    setMessage(null);
     try {
       const res = await fetch(`/api/posts/${postId}/share-now`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Paylaşım başarısız");
-      setMessage(formatResultsMessage(data, "share"));
+      
+      if (data.results && Array.isArray(data.results)) {
+        for (const r of data.results) {
+          if (r.success) {
+            addAlert("success", `${r.accountName || r.provider} hesabında paylaşım başarılı.`);
+          } else {
+            addAlert("danger", `${r.accountName || r.provider} hesabında paylaşım başarısız: ${r.error || "Bilinmeyen hata"}`);
+          }
+        }
+      } else {
+        addAlert("success", "Gönderi başarıyla yayınlandı.");
+      }
       if (data.post?.status) setListTab(listTabForStatus(String(data.post.status)));
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Hata");
+      addAlert("danger", e instanceof Error ? e.message : "Hata");
     } finally {
       setBusy(false);
     }
@@ -270,7 +300,6 @@ export function PostsWorkspace({
     const postId = deleteConfirmId;
     if (!postId || !canEdit) return;
     setBusy(true);
-    setMessage(null);
     try {
       const post = posts.find((p) => p.id === postId);
       const isPostDeleted = post && (post as any).isDeleted;
@@ -285,13 +314,13 @@ export function PostsWorkspace({
         composer.resetCompose();
       }
       if (isPostDeleted) {
-        setMessage("Gönderi kalıcı olarak silindi.");
+        addAlert("success", "Gönderi kalıcı olarak silindi.");
       } else {
-        setMessage("Gönderi silindi (Silinenler klasörüne taşındı).");
+        addAlert("success", "Gönderi silindi (Silinenler klasörüne taşındı).");
       }
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Silinemedi");
+      addAlert("danger", e instanceof Error ? e.message : "Silinemedi");
     } finally {
       setBusy(false);
       setDeleteConfirmId(null);
@@ -301,16 +330,26 @@ export function PostsWorkspace({
   async function restorePost(postId: string) {
     if (!canEdit) return;
     setBusy(true);
-    setMessage(null);
     try {
       const res = await fetch(`/api/posts/${postId}/restore`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Geri yüklenemedi");
-      setMessage("Gönderi geri yüklendi ve tekrar yayınlandı.");
+      
+      if (data.results && Array.isArray(data.results)) {
+        for (const r of data.results) {
+          if (r.success) {
+            addAlert("success", `${r.accountName || r.provider} hesabında yeniden paylaşım başarılı.`);
+          } else {
+            addAlert("danger", `${r.accountName || r.provider} hesabında yeniden paylaşım başarısız: ${r.error || "Bilinmeyen hata"}`);
+          }
+        }
+      } else {
+        addAlert("success", "Gönderi geri yüklendi ve tekrar yayınlandı.");
+      }
       setListTab("PUBLISHED");
       await refresh();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Geri yüklenemedi");
+      addAlert("danger", e instanceof Error ? e.message : "Geri yüklenemedi");
     } finally {
       setBusy(false);
     }
@@ -319,7 +358,6 @@ export function PostsWorkspace({
   async function uploadFiles(files: File[]) {
     if (!canEdit) return;
     setBusy(true);
-    setMessage(null);
     try {
       for (const file of files) {
         if (file.size > 100 * 1024 * 1024) {
@@ -393,9 +431,9 @@ export function PostsWorkspace({
           },
         ]);
       }
-      setMessage("Medya yüklendi.");
+      addAlert("success", "Medya başarıyla yüklendi.");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Medya yüklenemedi");
+      addAlert("danger", e instanceof Error ? e.message : "Medya yüklenemedi");
     } finally {
       setBusy(false);
     }
@@ -407,8 +445,8 @@ export function PostsWorkspace({
         <ComposerShell
           canEdit={canEdit}
           busy={busy}
-          message={message}
-          onDismissMessage={() => setMessage(null)}
+          alerts={alerts}
+          onDismissAlert={(id) => setAlerts((prev) => prev.filter((x) => x.id !== id))}
           onClose={() => {
             setMode("list");
             composer.resetCompose();
@@ -479,12 +517,31 @@ export function PostsWorkspace({
         ) : null}
       </div>
 
-      {message ? (
-        <Alert status="accent">
-          <Alert.Content>
-            <Alert.Description>{message}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+      {alerts.length > 0 ? (
+        <div className="space-y-2">
+          {alerts.map((a) => (
+            <Alert
+              key={a.id}
+              color={a.type}
+              className={`${
+                a.type === "success" 
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
+                  : a.type === "danger" 
+                    ? "bg-rose-50 border-rose-200 text-rose-800" 
+                    : "bg-amber-50 border-amber-200 text-amber-800"
+              } border p-3 rounded-xl flex justify-between items-center text-sm`}
+            >
+              <span>{a.message}</span>
+              <button
+                type="button"
+                onClick={() => setAlerts((prev) => prev.filter((x) => x.id !== a.id))}
+                className="text-xs opacity-60 hover:opacity-100 font-bold ml-3"
+              >
+                ✕
+              </button>
+            </Alert>
+          ))}
+        </div>
       ) : null}
 
       <div className="flex flex-wrap gap-1 border-b border-ink-200/70 bg-white px-1">

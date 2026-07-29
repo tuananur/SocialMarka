@@ -536,12 +536,13 @@ export function InboxClient({
                           const topMsg = active.messages[0];
                           return (
                             <div className="flex gap-3 items-start bg-white p-4 rounded-2xl border border-ink-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-                              <Avatar
-                                src={active.senderAvatar || undefined}
-                                name={active.senderName}
-                                size="sm"
-                                className="ring-2 ring-amber-100"
-                              />
+                              <Avatar className="h-8 w-8 ring-2 ring-amber-100 bg-ink-200">
+                                {active.senderAvatar ? (
+                                  <Avatar.Image src={active.senderAvatar} alt="" />
+                                ) : (
+                                  <Avatar.Fallback>{active.senderName[0]}</Avatar.Fallback>
+                                )}
+                              </Avatar>
                               <div className="flex-1 space-y-1">
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs font-bold text-ink-900">{active.senderName}</span>
@@ -571,12 +572,21 @@ export function InboxClient({
                             <h4 className="text-[11px] font-bold text-ink-400 uppercase tracking-wider mb-2">Yanıtlar</h4>
                             {active.messages.slice(1).map((m) => (
                               <div key={m.id} className="flex gap-2.5 items-start bg-white/70 p-3 rounded-xl border border-ink-100/50 relative">
-                                <Avatar
-                                  src={m.senderType === "AGENT" ? active.socialAccount.profilePicUrl || undefined : undefined}
-                                  name={m.senderType === "AGENT" ? active.socialAccount.accountName : active.senderName}
-                                  size="sm"
-                                  className="w-6 h-6 text-[10px]"
-                                />
+                                <Avatar className="w-6 h-6 text-[10px] bg-ink-200">
+                                  {m.senderType === "AGENT" ? (
+                                    active.socialAccount.profilePicUrl ? (
+                                      <Avatar.Image src={active.socialAccount.profilePicUrl} alt="" />
+                                    ) : (
+                                      <Avatar.Fallback>{active.socialAccount.accountName[0]}</Avatar.Fallback>
+                                    )
+                                  ) : (
+                                    active.senderAvatar ? (
+                                      <Avatar.Image src={active.senderAvatar} alt="" />
+                                    ) : (
+                                      <Avatar.Fallback>{active.senderName[0]}</Avatar.Fallback>
+                                    )
+                                  )}
+                                </Avatar>
                                 <div className="flex-1 space-y-1">
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-ink-800">
