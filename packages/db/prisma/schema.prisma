@@ -215,6 +215,8 @@ model InboxMessage {
   conversationId String
   senderType     SenderType
   messageText    String     @db.Text
+  remoteId       String?
+  isLiked        Boolean    @default(false)
   createdAt      DateTime   @default(now())
 
   conversation InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

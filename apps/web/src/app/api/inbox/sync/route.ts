@@ -89,6 +89,7 @@ export async function POST(_req: Request) {
                           conversationId: conversation.id,
                           senderType: isAgent ? SenderType.AGENT : SenderType.USER,
                           messageText: msgItem.message,
+                          remoteId: msgItem.id,
                           createdAt: msgItem.created_time ? new Date(msgItem.created_time) : new Date(),
                         },
                       });
@@ -186,6 +187,7 @@ export async function POST(_req: Request) {
                           conversationId: conversation.id,
                           senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
                           messageText: commentText,
+                          remoteId: comment.id,
                           createdAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
                         },
                       });
@@ -255,6 +257,7 @@ export async function POST(_req: Request) {
                               conversationId: conversation.id,
                               senderType: SenderType.USER,
                               messageText: commentText,
+                              remoteId: comment.id,
                               createdAt: comment.created_time ? new Date(comment.created_time) : new Date(),
                             },
                           });
@@ -401,6 +404,7 @@ export async function POST(_req: Request) {
                   conversationId: conversation.id,
                   senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
                   messageText: commentText,
+                  remoteId,
                   createdAt,
                 },
               });
@@ -523,6 +527,7 @@ export async function POST(_req: Request) {
                     conversationId: conversation.id,
                     senderType: sender.toLowerCase() === target.socialAccount.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
                     messageText: commentText,
+                    remoteId,
                     createdAt,
                   },
                 });
@@ -587,6 +592,7 @@ export async function POST(_req: Request) {
                       conversationId: conversation.id,
                       senderType: sender.toLowerCase() === target.socialAccount.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
                       messageText: commentText,
+                      remoteId: comment.id,
                       createdAt: comment.timestamp ? new Date(comment.timestamp) : new Date(),
                     },
                   });

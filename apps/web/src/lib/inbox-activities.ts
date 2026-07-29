@@ -18,13 +18,16 @@ export async function getLiveActivities(workspaceId: string) {
   // A. Comments
   const recentConversations = await prisma.inboxConversation.findMany({
     where: { workspaceId },
-    include: { socialAccount: true },
+    include: { socialAccount: true, messages: { take: 1, orderBy: { createdAt: "desc" } } },
     orderBy: { lastMessageAt: "desc" },
     take: 15,
   });
   for (const conv of recentConversations) {
+    const lastMsg = conv.messages[0];
     activitiesList.push({
-      id: `act-conv-${conv.id}`,
+      id: lastMsg ? lastMsg.id : `act-conv-${conv.id}`,
+      remoteId: lastMsg?.remoteId || null,
+      thanked: lastMsg?.isLiked || false,
       senderName: conv.senderName,
       senderAvatar: conv.senderAvatar || null,
       actionText: `gönderinize yorum yaptı: "${conv.lastMessage?.slice(0, 60)}"`,

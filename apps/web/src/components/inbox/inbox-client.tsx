@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar, Button, Card, Chip, Input } from "@heroui/react";
 import { ProviderIcon } from "../posts/provider-icon";
@@ -103,12 +103,16 @@ export function InboxClient({
   const router = useRouter();
   const [activeId, setActiveId] = useState(initial[0]?.id || null);
   const [reply, setReply] = useState("");
+  const [replyingTo, setReplyingTo] = useState<{ id: string, text: string } | null>(null);
+  const [editMode, setEditMode] = useState<{ id: string, text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [mainTab, setMainTab] = useState<"messages" | "activities">("messages");
   const [filter, setFilter] = useState<"ALL" | "COMMENT" | "DIRECT_MESSAGE" | "UNREAD">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [activities, setActivities] = useState<Activity[]>(initialActivities && initialActivities.length > 0 ? initialActivities : INITIAL_ACTIVITIES);
   const [activityFilter, setActivityFilter] = useState<"ALL" | "LIKE" | "FOLLOW" | "REPOST" | "SAVE">("ALL");
+
+  const [hasSyncedOnLoad, setHasSyncedOnLoad] = useState(false);
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -170,7 +174,7 @@ export function InboxClient({
       const res = await fetch("/api/inbox/reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: active.id, message: reply }),
+        body: JSON.stringify({ conversationId: active.id, message: reply, parentMessageId: replyingTo?.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gönderilemedi");
@@ -195,6 +199,7 @@ export function InboxClient({
         )
       );
       setReply("");
+      setReplyingTo(null);
       router.refresh();
     } catch (e) {
       showAlert("Yorum Yanıtı İletilemedi", e instanceof Error ? e.message : "Yanıt gönderilirken bir hata oluştu.");
@@ -203,10 +208,24 @@ export function InboxClient({
     }
   }
 
-  function handleThankActivity(id: string) {
+  async function handleThankActivity(id: string, remoteId?: string, isLiked?: boolean) {
+    // Optimistic UI
     setActivities((prev) =>
       prev.map((a) => (a.id === id ? { ...a, thanked: !a.thanked } : a))
     );
+    if (!remoteId) return;
+    try {
+      await fetch("/api/inbox/like", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: id, liked: !isLiked })
+      });
+    } catch {
+      // Revert on error
+      setActivities((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, thanked: !!isLiked } : a))
+      );
+    }
   }
 
   const [syncing, setSyncing] = useState(false);
@@ -242,6 +261,13 @@ export function InboxClient({
       setSyncing(false);
     }
   }
+
+  useEffect(() => {
+    if (!hasSyncedOnLoad) {
+      setHasSyncedOnLoad(true);
+      handleSync();
+    }
+  }, [hasSyncedOnLoad]);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -473,18 +499,48 @@ export function InboxClient({
                     {active.messages.map((m) => (
                       <div
                         key={m.id}
-                        className={`flex flex-col max-w-[70%] ${
+                        className={`flex flex-col group max-w-[70%] ${
                           m.senderType === "AGENT" ? "ml-auto items-end" : "items-start"
                         }`}
                       >
-                        <div
-                          className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                            m.senderType === "AGENT"
-                              ? "bg-slate-700 text-white rounded-tr-none"
-                              : "bg-white border border-ink-100 text-ink-900 rounded-tl-none"
-                          }`}
-                        >
-                          {m.messageText}
+                        <div className="flex items-center gap-2">
+                          {m.senderType === "USER" && (
+                            <button
+                              onClick={() => setReplyingTo({ id: m.id, text: m.messageText })}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-ink-500 hover:text-amber-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
+                            >
+                              Yanıtla
+                            </button>
+                          )}
+                          {m.senderType === "AGENT" && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <button
+                                onClick={() => { setEditMode({ id: m.id, text: m.messageText }); setReply(m.messageText); }}
+                                className="text-[10px] text-ink-500 hover:text-blue-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
+                              >
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!confirm("Bu mesajı silmek istediğinize emin misiniz?")) return;
+                                  await fetch(`/api/inbox/message/${m.id}`, { method: "DELETE" });
+                                  setConversations((prev) => prev.map(c => c.id === active.id ? { ...c, messages: c.messages.filter(msg => msg.id !== m.id) } : c));
+                                }}
+                                className="text-[10px] text-ink-500 hover:text-rose-600 bg-white shadow-sm border border-ink-100 rounded-full px-2 py-1"
+                              >
+                                Sil
+                              </button>
+                            </div>
+                          )}
+                          <div
+                            className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                              m.senderType === "AGENT"
+                                ? "bg-slate-700 text-white rounded-tr-none"
+                                : "bg-white border border-ink-100 text-ink-900 rounded-tl-none"
+                            }`}
+                          >
+                            {m.messageText}
+                          </div>
                         </div>
                         <span className="mt-1 text-[9px] text-ink-400 font-medium px-1">
                           {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -492,27 +548,66 @@ export function InboxClient({
                       </div>
                     ))}
                   </div>
-                  <div className="flex gap-2 border-t border-ink-100 p-3 bg-white">
-                    <Input
-                      fullWidth
-                      value={reply}
-                      onChange={(e) => setReply(e.target.value)}
-                      placeholder={
-                        active.type === "COMMENT"
-                          ? "Yoruma cevap yazın..."
-                          : "Direkt mesaj yazın..."
-                      }
-                      onKeyDown={(e) => e.key === "Enter" && sendReply()}
-                      className="bg-ink-50/50"
-                    />
-                    <Button
-                      variant="secondary"
-                      className="font-semibold px-5"
-                      isDisabled={busy || !reply.trim()}
-                      onPress={sendReply}
-                    >
-                      {busy ? "Gönderiliyor..." : "Gönder"}
-                    </Button>
+                  <div className="flex flex-col border-t border-ink-100 bg-white">
+                    {(replyingTo || editMode) && (
+                      <div className="flex items-center justify-between px-4 py-2 bg-ink-50/50 text-xs text-ink-600 border-b border-ink-100">
+                        <span className="truncate">
+                          <span className="font-semibold">{editMode ? "Düzenleniyor:" : "Yanıtlanıyor:"}</span> {editMode ? editMode.text : replyingTo?.text}
+                        </span>
+                        <button onClick={() => { setReplyingTo(null); setEditMode(null); setReply(""); }} className="text-ink-400 hover:text-ink-900">
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex gap-2 p-3">
+                      <Input
+                        fullWidth
+                        value={reply}
+                        onChange={(e) => setReply(e.target.value)}
+                        placeholder={
+                          editMode ? "Mesajı düzenle..." :
+                          active.type === "COMMENT"
+                            ? "Yoruma cevap yazın..."
+                            : "Direkt mesaj yazın..."
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            if (editMode) {
+                              // Edit logic handled below
+                            } else {
+                              sendReply();
+                            }
+                          }
+                        }}
+                        className="bg-ink-50/50"
+                      />
+                      <Button
+                        variant="secondary"
+                        className="font-semibold px-5"
+                        isDisabled={busy || !reply.trim()}
+                        onPress={async () => {
+                          if (editMode) {
+                            setBusy(true);
+                            try {
+                              await fetch(`/api/inbox/message/${editMode.id}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ message: reply }),
+                              });
+                              setConversations((prev) => prev.map(c => c.id === active.id ? { ...c, messages: c.messages.map(m => m.id === editMode.id ? { ...m, messageText: reply } : m) } : c));
+                              setEditMode(null);
+                              setReply("");
+                            } finally {
+                              setBusy(false);
+                            }
+                          } else {
+                            sendReply();
+                          }
+                        }}
+                      >
+                        {busy ? "İşleniyor..." : editMode ? "Kaydet" : "Gönder"}
+                      </Button>
+                    </div>
                   </div>
                 </>
               ) : (
@@ -598,7 +693,7 @@ export function InboxClient({
                             className={`font-semibold text-xs ${
                               act.thanked ? "border-emerald-500 text-emerald-600 bg-emerald-50" : ""
                             }`}
-                            onPress={() => handleThankActivity(act.id)}
+                            onPress={() => handleThankActivity(act.id, act.remoteId, act.thanked)}
                           >
                             {act.thanked ? "✓ Yorum Beğenildi" : "Yorumu Beğen"}
                           </Button>
@@ -610,7 +705,7 @@ export function InboxClient({
                             className={`font-semibold text-xs ${
                               act.thanked ? "border-emerald-500 text-emerald-600 bg-emerald-50" : ""
                             }`}
-                            onPress={() => handleThankActivity(act.id)}
+                            onPress={() => handleThankActivity(act.id, act.remoteId, act.thanked)}
                           >
                             {act.thanked ? "✓ Takip Edildi" : "Geri Takip Et"}
                           </Button>

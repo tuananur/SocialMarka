@@ -57,6 +57,20 @@ export interface PlatformAdapter {
     accessToken: string;
     conversationRemoteId: string;
     message: string;
+  }): Promise<{ success: boolean; errorMessage?: string; remoteMessageId?: string }>;
+  editInboxReply?(params: {
+    accessToken: string;
+    remoteMessageId: string;
+    message: string;
+  }): Promise<{ success: boolean; errorMessage?: string }>;
+  deleteInboxReply?(params: {
+    accessToken: string;
+    remoteMessageId: string;
+  }): Promise<{ success: boolean; errorMessage?: string }>;
+  likeInboxItem?(params: {
+    accessToken: string;
+    remoteMessageId: string;
+    liked: boolean;
   }): Promise<{ success: boolean; errorMessage?: string }>;
   refreshToken?(refreshToken: string): Promise<{
     accessToken: string;

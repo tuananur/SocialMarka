@@ -14,6 +14,8 @@ export async function POST(req: Request) {
   const body = await req.json();
   const conversationId = String(body.conversationId || "");
   const messageText = String(body.message || "").trim();
+  const parentMessageId = body.parentMessageId ? String(body.parentMessageId) : null;
+  
   if (!conversationId || !messageText) {
     return NextResponse.json({ error: "Eksik alan" }, { status: 400 });
   }
@@ -25,12 +27,56 @@ export async function POST(req: Request) {
   if (!conversation) {
     return NextResponse.json({ error: "Konuşma bulunamadı" }, { status: 404 });
   }
+  
+  let targetRemoteId = conversation.remoteId || conversation.id;
+  if (parentMessageId) {
+    const parentMsg = await prisma.inboxMessage.findFirst({
+      where: { id: parentMessageId, conversationId }
+    });
+    if (parentMsg && parentMsg.remoteId) {
+      targetRemoteId = parentMsg.remoteId;
+    }
+  }
 
+  // Publish reply synchronously to platform
+  let apiError: string | null = null;
+  let sentRemoteId: string | undefined = undefined;
+  try {
+    const account = conversation.socialAccount;
+    let accessToken = "stub-token";
+    if (account.encryptedAccessToken) {
+      accessToken = decryptToken(account.encryptedAccessToken);
+    }
+
+    const adapter = getPlatformAdapter(account.provider);
+    if (adapter.sendInboxReply) {
+      const result = await adapter.sendInboxReply({
+        accessToken,
+        conversationRemoteId: targetRemoteId,
+        message: messageText,
+      });
+      if (!result.success) {
+        apiError = result.errorMessage || "API yanıt hatası";
+      } else {
+        sentRemoteId = result.remoteMessageId;
+      }
+    } else {
+      apiError = "Bu platform için yorum yanıtlama desteklenmiyor";
+    }
+  } catch (err: any) {
+    apiError = err?.message || String(err);
+  }
+
+  if (apiError) {
+    return NextResponse.json({ error: `Yorum iletilemedi: ${apiError}` }, { status: 502 });
+  }
+  
   const message = await prisma.inboxMessage.create({
     data: {
       conversationId,
       senderType: SenderType.AGENT,
       messageText,
+      remoteId: sentRemoteId,
     },
   });
 
@@ -43,35 +89,6 @@ export async function POST(req: Request) {
     },
   });
 
-  // Publish reply synchronously to platform
-  let apiError: string | null = null;
-  try {
-    const account = conversation.socialAccount;
-    let accessToken = "stub-token";
-    if (account.encryptedAccessToken) {
-      accessToken = decryptToken(account.encryptedAccessToken);
-    }
-
-    const adapter = getPlatformAdapter(account.provider);
-    if (adapter.sendInboxReply) {
-      const result = await adapter.sendInboxReply({
-        accessToken,
-        conversationRemoteId: conversation.remoteId || conversation.id,
-        message: messageText,
-      });
-      if (!result.success) {
-        apiError = result.errorMessage || "API yanıt hatası";
-      }
-    } else {
-      apiError = "Bu platform için yorum yanıtlama desteklenmiyor";
-    }
-  } catch (err: any) {
-    apiError = err?.message || String(err);
-  }
-
-  if (apiError) {
-    return NextResponse.json({ error: `Yorum iletilemedi: ${apiError}` }, { status: 502 });
-  }
 
   // Enqueue as background task fallback
   try {
