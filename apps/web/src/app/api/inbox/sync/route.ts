@@ -415,7 +415,7 @@ export async function POST(_req: Request) {
                 await prisma.inboxMessage.create({
                   data: {
                     conversationId: conversation.id,
-                    senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                    senderType: commentSnippet.authorChannelId?.value === account.providerAccountId ? SenderType.AGENT : SenderType.USER,
                     messageText: commentText,
                     remoteId,
                     createdAt,
@@ -443,7 +443,7 @@ export async function POST(_req: Request) {
                   await prisma.inboxMessage.create({
                     data: {
                       conversationId: conversation.id,
-                      senderType: replySender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                      senderType: replySnippet.authorChannelId?.value === account.providerAccountId ? SenderType.AGENT : SenderType.USER,
                       messageText: replyText,
                       remoteId: replyRemoteId,
                       createdAt: replyCreatedAt,
@@ -573,7 +573,7 @@ export async function POST(_req: Request) {
                 await prisma.inboxMessage.create({
                   data: {
                     conversationId: conversation.id,
-                    senderType: sender.toLowerCase() === target.socialAccount.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                    senderType: commentSnippet.authorChannelId?.value === target.socialAccount.providerAccountId ? SenderType.AGENT : SenderType.USER,
                     messageText: commentText,
                     remoteId,
                     createdAt,
@@ -601,7 +601,7 @@ export async function POST(_req: Request) {
                   await prisma.inboxMessage.create({
                     data: {
                       conversationId: conversation.id,
-                      senderType: replySender.toLowerCase() === target.socialAccount.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                      senderType: replySnippet.authorChannelId?.value === target.socialAccount.providerAccountId ? SenderType.AGENT : SenderType.USER,
                       messageText: replyText,
                       remoteId: replyRemoteId,
                       createdAt: replyCreatedAt,

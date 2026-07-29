@@ -61,6 +61,68 @@ export function AccountsTable({
     description: string;
   } | null>(null);
 
+  const [groups, setGroups] = useState<any[]>([]);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [groupAccounts, setGroupAccounts] = useState<string[]>([]);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  async function fetchGroups() {
+    try {
+      const res = await fetch("/api/accounts/groups");
+      const data = await res.json();
+      if (res.ok) setGroups(data.groups || []);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleSaveGroup() {
+    if (!groupName.trim()) return;
+    setBusy(true);
+    try {
+      const url = editingGroupId ? `/api/accounts/groups/${editingGroupId}` : "/api/accounts/groups";
+      const method = editingGroupId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: groupName, accountIds: groupAccounts }),
+      });
+      if (res.ok) {
+        setIsGroupModalOpen(false);
+        setGroupName("");
+        setGroupAccounts([]);
+        setEditingGroupId(null);
+        await fetchGroups();
+        router.refresh();
+      } else {
+        const d = await res.json();
+        alert(d.error || "Grup kaydedilemedi");
+      }
+    } catch (err: any) {
+      alert(err?.message || "Bir hata oluştu");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteGroup(id: string) {
+    if (!confirm("Bu grubu silmek istediğinize emin misiniz?")) return;
+    try {
+      const res = await fetch(`/api/accounts/groups/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchGroups();
+        router.refresh();
+      }
+    } catch (err: any) {
+      alert(err?.message || "Silme hatası");
+    }
+  }
+
   useEffect(() => {
     const ok =
       search.get("status") === "success" || search.get("connected") === "1";
@@ -204,6 +266,61 @@ export function AccountsTable({
             </div>
           );
         })}
+      </div>
+
+      {/* Gruplar Bölümü */}
+      <div className="rounded-2xl border border-ink-200/60 bg-white p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-ink-800">Hesap Grupları</h2>
+          {canManage && (
+            <button
+              onClick={() => {
+                setEditingGroupId(null);
+                setGroupName("");
+                setGroupAccounts([]);
+                setIsGroupModalOpen(true);
+              }}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800"
+            >
+              + Yeni Grup Oluştur
+            </button>
+          )}
+        </div>
+        {groups.length === 0 ? (
+          <p className="text-xs text-ink-400">Henüz bir hesap grubu oluşturulmamış.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {groups.map((g) => (
+              <div
+                key={g.id}
+                className="flex items-center gap-2 rounded-xl border border-ink-150 bg-ink-50/50 px-3 py-1.5 text-xs font-semibold text-ink-700"
+              >
+                <span>{g.name} ({g.accounts.length} hesap)</span>
+                {canManage && (
+                  <div className="flex items-center gap-1 border-l border-ink-200 pl-1.5">
+                    <button
+                      onClick={() => {
+                        setEditingGroupId(g.id);
+                        setGroupName(g.name);
+                        setGroupAccounts(g.accounts.map((a: any) => a.id));
+                        setIsGroupModalOpen(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteGroup(g.id)}
+                      className="text-rose-600 hover:text-rose-800"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -352,6 +469,68 @@ export function AccountsTable({
         onConfirm={() => void confirmDisconnect()}
         onCancel={() => setDisconnectId(null)}
       />
+
+      {/* Group Modal Dialog */}
+      {isGroupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
+            <h3 className="text-lg font-bold text-ink-950">
+              {editingGroupId ? "Grubu Düzenle" : "Yeni Grup Oluştur"}
+            </h3>
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-ink-600">Grup Adı</label>
+              <input
+                type="text"
+                placeholder="Örn: Pazarlama Grubu"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              
+              <label className="block text-xs font-semibold text-ink-600 mt-2">Hesapları Seçin</label>
+              <div className="max-h-48 overflow-y-auto border border-ink-150 rounded-xl p-2 space-y-2">
+                {accounts.length === 0 ? (
+                  <p className="text-xs text-ink-400 p-2">Grup eklemek için önce en az bir hesap bağlamalısınız.</p>
+                ) : (
+                  accounts.map((a) => (
+                    <label key={a.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer p-1 hover:bg-ink-50 rounded-lg">
+                      <input
+                        type="checkbox"
+                        checked={groupAccounts.includes(a.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setGroupAccounts((prev) => [...prev, a.id]);
+                          } else {
+                            setGroupAccounts((prev) => prev.filter((id) => id !== a.id));
+                          }
+                        }}
+                      />
+                      <ProviderIcon provider={a.provider} size={16} />
+                      <span>{a.accountName}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setIsGroupModalOpen(false)}
+                className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-600 hover:bg-ink-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveGroup}
+                disabled={busy || !groupName.trim()}
+                className="rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {busy ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
