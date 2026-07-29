@@ -18,23 +18,28 @@ export async function getLiveActivities(workspaceId: string) {
   // A. Comments
   const recentConversations = await prisma.inboxConversation.findMany({
     where: { workspaceId },
-    include: { socialAccount: true, messages: { take: 1, orderBy: { createdAt: "desc" } } },
+    include: { socialAccount: true },
     orderBy: { lastMessageAt: "desc" },
     take: 15,
   });
   for (const conv of recentConversations) {
-    const lastMsg = conv.messages[0];
+    const lastUserMsg = await prisma.inboxMessage.findFirst({
+      where: { conversationId: conv.id, senderType: "USER" },
+      orderBy: { createdAt: "desc" }
+    });
+    if (!lastUserMsg) continue;
+
     activitiesList.push({
-      id: lastMsg ? lastMsg.id : `act-conv-${conv.id}`,
-      remoteId: lastMsg?.remoteId || null,
-      thanked: lastMsg?.isLiked || false,
+      id: lastUserMsg.id,
+      remoteId: lastUserMsg.remoteId || null,
+      thanked: lastUserMsg.isLiked || false,
       senderName: conv.senderName,
       senderAvatar: conv.senderAvatar || null,
-      actionText: `gönderinize yorum yaptı: "${conv.lastMessage?.slice(0, 60)}"`,
+      actionText: `gönderinize yorum yaptı: "${lastUserMsg.messageText.slice(0, 60)}"`,
       platform: conv.socialAccount.provider,
-      time: formatRelativeTime(conv.lastMessageAt),
+      time: formatRelativeTime(lastUserMsg.createdAt),
       type: "LIKE",
-      timestamp: conv.lastMessageAt.getTime(),
+      timestamp: lastUserMsg.createdAt.getTime(),
     });
   }
 

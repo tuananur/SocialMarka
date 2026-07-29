@@ -419,9 +419,11 @@ export function createLiveAdapter(platform: PlatformType): PlatformAdapter {
       if (isLocalToken(params.accessToken)) return { success: true };
       try {
         if (platform === "YOUTUBE") {
-          // YouTube doesnt support liking comment on behalf of channel easily via API like this (requires rating endpoint for videos, not comments)
-          // Actually youtube API supports rating comments but let's just mock it for now
-          return { success: true };
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/comments/setRating?id=${encodeURIComponent(params.remoteMessageId)}&rating=${params.liked ? "like" : "none"}`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${params.accessToken}` },
+          });
+          return { success: res.ok };
         }
         if (platform === "FACEBOOK" || platform === "INSTAGRAM") {
           const res = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(params.remoteMessageId)}/likes`, {
