@@ -15,6 +15,7 @@ import {
 export function PostManageCard({
   post,
   canEdit,
+  targetIndex,
   onOpen,
   onEdit,
   onDelete,
@@ -23,6 +24,7 @@ export function PostManageCard({
 }: {
   post: ManagePost;
   canEdit: boolean;
+  targetIndex?: number;
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -32,8 +34,14 @@ export function PostManageCard({
   const thumb = postThumbnail(post);
   const isVideo = postIsVideo(post);
   const when = post.scheduledAt ? new Date(post.scheduledAt) : null;
-  const accounts = post.targets.map((t) => t.socialAccount);
-  const error = postPrimaryError(post);
+  // If targetIndex is provided, show only that target; otherwise show all
+  const displayTargets = targetIndex != null && post.targets[targetIndex]
+    ? [post.targets[targetIndex]]
+    : post.targets;
+  const accounts = displayTargets.map((t) => t.socialAccount);
+  const error = targetIndex != null && post.targets[targetIndex]?.errorMessage
+    ? post.targets[targetIndex].errorMessage
+    : postPrimaryError(post);
   const showRetry =
     Boolean(onRetry) &&
     (post.status === "FAILED" ||

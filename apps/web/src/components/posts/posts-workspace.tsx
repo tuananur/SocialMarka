@@ -96,6 +96,21 @@ export function PostsWorkspace({
     return p.status === listTab;
   });
 
+  // Flatten: one card per target so each platform is shown separately
+  const flattenedItems = useMemo(() => {
+    const items: { post: Post; targetIndex: number; key: string }[] = [];
+    for (const post of filteredPosts) {
+      if (post.targets.length <= 1) {
+        items.push({ post, targetIndex: 0, key: post.id });
+      } else {
+        for (let i = 0; i < post.targets.length; i++) {
+          items.push({ post, targetIndex: i, key: `${post.id}__t${i}` });
+        }
+      }
+    }
+    return items;
+  }, [filteredPosts]);
+
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const t of listTabs) counts[t.id] = 0;
@@ -576,7 +591,7 @@ export function PostsWorkspace({
       </div>
 
       <div className="space-y-3">
-        {filteredPosts.length === 0 ? (
+        {flattenedItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-ink-200 bg-white py-14 text-center">
             <p className="text-sm text-ink-500">Bu sekmede gönderi yok.</p>
             <p className="mt-1 text-xs text-ink-400">
@@ -589,11 +604,12 @@ export function PostsWorkspace({
             ) : null}
           </div>
         ) : null}
-        {filteredPosts.map((post) => (
+        {flattenedItems.map(({ post, targetIndex, key }) => (
           <PostManageCard
-            key={post.id}
+            key={key}
             post={post}
             canEdit={canEdit}
+            targetIndex={post.targets.length > 1 ? targetIndex : undefined}
             onOpen={() => setDetailPost(post)}
             onEdit={() => openEdit(post)}
             onDelete={() => requestDeletePost(post.id)}

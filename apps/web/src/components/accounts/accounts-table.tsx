@@ -60,6 +60,8 @@ export function AccountsTable({
     title: string;
     description: string;
   } | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "danger"; message: string } | null>(null);
+  const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
 
   const [groups, setGroups] = useState<any[]>([]);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -99,28 +101,43 @@ export function AccountsTable({
         setEditingGroupId(null);
         await fetchGroups();
         router.refresh();
+        showToast("success", "Grup başarıyla kaydedildi.");
       } else {
         const d = await res.json();
-        alert(d.error || "Grup kaydedilemedi");
+        showToast("danger", d.error || "Grup kaydedilemedi");
       }
     } catch (err: any) {
-      alert(err?.message || "Bir hata oluştu");
+      showToast("danger", err?.message || "Bir hata oluştu");
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleDeleteGroup(id: string) {
-    if (!confirm("Bu grubu silmek istediğinize emin misiniz?")) return;
+  function handleDeleteGroup(id: string) {
+    setDeleteGroupId(id);
+  }
+
+  async function confirmDeleteGroup() {
+    if (!deleteGroupId) return;
     try {
-      const res = await fetch(`/api/accounts/groups/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/accounts/groups/${deleteGroupId}`, { method: "DELETE" });
       if (res.ok) {
         await fetchGroups();
         router.refresh();
+        showToast("success", "Grup başarıyla silindi.");
+      } else {
+        showToast("danger", "Grup silinemedi.");
       }
     } catch (err: any) {
-      alert(err?.message || "Silme hatası");
+      showToast("danger", err?.message || "Silme hatası");
+    } finally {
+      setDeleteGroupId(null);
     }
+  }
+
+  function showToast(type: "success" | "danger", message: string) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 6000);
   }
 
   useEffect(() => {
@@ -176,11 +193,12 @@ export function AccountsTable({
       if (res.ok) {
         setAccounts((prev) => prev.filter((a) => a.id !== disconnectId));
         setSelected((prev) => prev.filter((id) => id !== disconnectId));
+        showToast("success", "Hesap bağlantısı başarıyla kesildi.");
       } else {
-        alert(data.error || "Hesap bağlantısı kesilirken bir hata oluştu.");
+        showToast("danger", data.error || "Hesap bağlantısı kesilirken bir hata oluştu.");
       }
     } catch (err: any) {
-      alert(err?.message || "Hesap silme hatası oluştu.");
+      showToast("danger", err?.message || "Hesap silme hatası oluştu.");
     } finally {
       setBusy(false);
       setDisconnectId(null);
@@ -528,6 +546,40 @@ export function AccountsTable({
                 {busy ? "Kaydediliyor..." : "Kaydet"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Group Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deleteGroupId}
+        title="Grubu Sil"
+        description="Bu grubu silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+        confirmLabel="Sil"
+        danger
+        onConfirm={() => void confirmDeleteGroup()}
+        onCancel={() => setDeleteGroupId(null)}
+      />
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-[slideUp_0.3s_ease-out]">
+          <div
+            className={`flex items-center gap-3 rounded-xl border px-5 py-3 shadow-lg text-sm font-medium ${
+              toast.type === "success"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-rose-50 border-rose-200 text-rose-800"
+            }`}
+          >
+            <span>{toast.type === "success" ? "✅" : "❌"}</span>
+            <span>{toast.message}</span>
+            <button
+              type="button"
+              className="ml-2 opacity-60 hover:opacity-100 font-bold text-xs"
+              onClick={() => setToast(null)}
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
