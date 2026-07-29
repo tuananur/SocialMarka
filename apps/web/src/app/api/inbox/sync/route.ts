@@ -341,117 +341,121 @@ export async function POST(_req: Request) {
         const videoItems = playlistJson.items || [];
         debugLogs.push(`[${account.accountName}] Kanaldan ${videoItems.length} güncel video bulundu`);
 
-        // 3. Loop over videos and fetch comments
-        for (const vItem of videoItems) {
+        // 3. Loop over videos and fetch comments in parallel
+        await Promise.all(videoItems.map(async (vItem: any) => {
           const videoId = vItem.snippet?.resourceId?.videoId;
-          if (!videoId) continue;
+          if (!videoId) return;
 
-          const commentRes = await fetch(
-            `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=100&access_token=${accessToken}`
-          );
-          if (!commentRes.ok) {
-            continue;
-          }
-          const commentJson = await commentRes.json();
-          const commentItems = commentJson.items || [];
+          try {
+            const commentRes = await fetch(
+              `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=100&access_token=${accessToken}`
+            );
+            if (!commentRes.ok) {
+              return;
+            }
+            const commentJson = await commentRes.json();
+            const commentItems = commentJson.items || [];
 
-          if (commentItems.length > 0) {
-            debugLogs.push(`[${account.accountName}] Video ${videoId} için ${commentItems.length} yorum bulundu`);
-          }
+            if (commentItems.length > 0) {
+              debugLogs.push(`[${account.accountName}] Video ${videoId} için ${commentItems.length} yorum bulundu`);
+            }
 
-          for (const item of commentItems) {
-            const commentSnippet = item.snippet?.topLevelComment?.snippet;
-            if (!commentSnippet) continue;
+            for (const item of commentItems) {
+              const commentSnippet = item.snippet?.topLevelComment?.snippet;
+              if (!commentSnippet) continue;
 
-            const sender = commentSnippet.authorDisplayName || "youtube_user";
-            const commentText = commentSnippet.textOriginal || commentSnippet.textDisplay || "";
-            const senderAvatar = commentSnippet.authorProfileImageUrl || "";
-            const remoteId = item.snippet.topLevelComment.id;
-            const createdAt = commentSnippet.publishedAt ? new Date(commentSnippet.publishedAt) : new Date();
+              const sender = commentSnippet.authorDisplayName || "youtube_user";
+              const commentText = commentSnippet.textOriginal || commentSnippet.textDisplay || "";
+              const senderAvatar = commentSnippet.authorProfileImageUrl || "";
+              const remoteId = item.snippet.topLevelComment.id;
+              const createdAt = commentSnippet.publishedAt ? new Date(commentSnippet.publishedAt) : new Date();
 
-            if (!commentText) continue;
+              if (!commentText) continue;
 
-            let conversation = await prisma.inboxConversation.findFirst({
-              where: {
-                socialAccountId: account.id,
-                senderName: sender,
-                type: InboxType.COMMENT,
-              },
-            });
-
-            if (!conversation) {
-              conversation = await prisma.inboxConversation.create({
-                data: {
-                  workspaceId: ctx.workspaceId,
+              let conversation = await prisma.inboxConversation.findFirst({
+                where: {
                   socialAccountId: account.id,
                   senderName: sender,
-                  senderAvatar,
-                  lastMessage: commentText,
-                  lastMessageAt: createdAt,
                   type: InboxType.COMMENT,
-                  remoteId,
                 },
               });
-            } else {
-              await prisma.inboxConversation.update({
-                where: { id: conversation.id },
-                data: {
-                  lastMessage: commentText,
-                  lastMessageAt: createdAt,
-                  senderAvatar,
-                  isRead: false,
-                },
-              });
-            }
 
-            const existingMsg = await prisma.inboxMessage.findFirst({
-              where: {
-                conversationId: conversation.id,
-                ...(remoteId ? { remoteId } : { messageText: commentText }),
-              },
-            });
-            if (!existingMsg) {
-              await prisma.inboxMessage.create({
-                data: {
-                  conversationId: conversation.id,
-                  senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
-                  messageText: commentText,
-                  remoteId,
-                  createdAt,
-                },
-              });
-            }
-
-            // Process YouTube replies
-            const replies = item.replies?.comments || [];
-            for (const reply of replies) {
-              const replySnippet = reply.snippet;
-              if (!replySnippet) continue;
-              const replySender = replySnippet.authorDisplayName || "youtube_user";
-              const replyText = replySnippet.textOriginal || replySnippet.textDisplay || "";
-              const replyRemoteId = reply.id;
-              const replyCreatedAt = replySnippet.publishedAt ? new Date(replySnippet.publishedAt) : new Date();
-
-              const existingReplyMsg = await prisma.inboxMessage.findFirst({
-                where: {
-                  conversationId: conversation.id,
-                  ...(replyRemoteId ? { remoteId: replyRemoteId } : { messageText: replyText }),
-                },
-              });
-              if (!existingReplyMsg) {
-                await prisma.inboxMessage.create({
+              if (!conversation) {
+                conversation = await prisma.inboxConversation.create({
                   data: {
-                    conversationId: conversation.id,
-                    senderType: replySender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
-                    messageText: replyText,
-                    remoteId: replyRemoteId,
-                    createdAt: replyCreatedAt,
+                    workspaceId: ctx.workspaceId,
+                    socialAccountId: account.id,
+                    senderName: sender,
+                    senderAvatar,
+                    lastMessage: commentText,
+                    lastMessageAt: createdAt,
+                    type: InboxType.COMMENT,
+                    remoteId,
+                  },
+                });
+              } else {
+                await prisma.inboxConversation.update({
+                  where: { id: conversation.id },
+                  data: {
+                    lastMessage: commentText,
+                    lastMessageAt: createdAt,
+                    senderAvatar,
+                    isRead: false,
                   },
                 });
               }
+
+              const existingMsg = await prisma.inboxMessage.findFirst({
+                where: {
+                  conversationId: conversation.id,
+                  ...(remoteId ? { remoteId } : { messageText: commentText }),
+                },
+              });
+              if (!existingMsg) {
+                await prisma.inboxMessage.create({
+                  data: {
+                    conversationId: conversation.id,
+                    senderType: sender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                    messageText: commentText,
+                    remoteId,
+                    createdAt,
+                  },
+                });
+              }
+
+              // Process YouTube replies
+              const replies = item.replies?.comments || [];
+              for (const reply of replies) {
+                const replySnippet = reply.snippet;
+                if (!replySnippet) continue;
+                const replySender = replySnippet.authorDisplayName || "youtube_user";
+                const replyText = replySnippet.textOriginal || replySnippet.textDisplay || "";
+                const replyRemoteId = reply.id;
+                const replyCreatedAt = replySnippet.publishedAt ? new Date(replySnippet.publishedAt) : new Date();
+
+                const existingReplyMsg = await prisma.inboxMessage.findFirst({
+                  where: {
+                    conversationId: conversation.id,
+                    ...(replyRemoteId ? { remoteId: replyRemoteId } : { messageText: replyText }),
+                  },
+                });
+                if (!existingReplyMsg) {
+                  await prisma.inboxMessage.create({
+                    data: {
+                      conversationId: conversation.id,
+                      senderType: replySender.toLowerCase() === account.accountName.toLowerCase() ? SenderType.AGENT : SenderType.USER,
+                      messageText: replyText,
+                      remoteId: replyRemoteId,
+                      createdAt: replyCreatedAt,
+                    },
+                  });
+                }
+              }
             }
+          } catch (itemErr: any) {
+            debugLogs.push(`Video ${videoId} yorum çekme hatası: ${itemErr?.message || itemErr}`);
           }
-        }
+        }));
       } catch (ytErr: any) {
         debugLogs.push(`[${account.accountName}] YouTube genel hata: ${ytErr?.message || ytErr}`);
       }
