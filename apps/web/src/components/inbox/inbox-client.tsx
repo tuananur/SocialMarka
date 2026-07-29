@@ -28,6 +28,7 @@ type Activity = {
   type: "LIKE" | "FOLLOW" | "REPOST" | "SAVE";
   thanked?: boolean;
   isSystem?: boolean;
+  remoteId?: string;
 };
 
 const INITIAL_ACTIVITIES: Activity[] = [
