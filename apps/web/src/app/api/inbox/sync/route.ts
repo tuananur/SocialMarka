@@ -741,7 +741,7 @@ export async function POST(_req: Request) {
       isRead: true,
       type: true,
       socialAccount: {
-        select: { accountName: true, provider: true },
+        select: { accountName: true, provider: true, profilePicUrl: true },
       },
       messages: {
         select: {

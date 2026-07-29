@@ -36,7 +36,7 @@ export default async function InboxPage() {
       isRead: true,
       type: true,
       socialAccount: {
-        select: { accountName: true, provider: true },
+        select: { accountName: true, provider: true, profilePicUrl: true },
       },
       messages: {
         select: {

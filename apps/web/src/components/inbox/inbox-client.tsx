@@ -13,7 +13,7 @@ type Conversation = {
   lastMessageAt: string;
   isRead: boolean;
   type: string;
-  socialAccount: { accountName: string; provider: string };
+  socialAccount: { accountName: string; provider: string; profilePicUrl?: string | null };
   messages: { id: string; senderType: string; messageText: string; createdAt: string }[];
 };
 
