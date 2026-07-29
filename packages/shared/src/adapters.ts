@@ -37,17 +37,21 @@ async function publishLinkedIn(params: {
     ? params.providerAccountId
     : `urn:li:person:${params.providerAccountId}`;
 
-  let imageFile = params.mediaFiles?.find((f) => f.mimeType.startsWith("image/"));
+  let mediaFile = params.mediaFiles?.find(
+    (f) => f.mimeType.startsWith("image/") || f.mimeType.startsWith("video/"),
+  );
+  let isVideo = Boolean(mediaFile?.mimeType.startsWith("video/"));
 
-  if (!imageFile && params.mediaUrls?.length) {
-    const imageUrl = params.mediaUrls.find((u) => /^https?:\/\//i.test(u) && !/\.(mp4|mov|webm)(\?|$)/i.test(u));
-    if (imageUrl) {
+  if (!mediaFile && params.mediaUrls?.length) {
+    const mediaUrl = params.mediaUrls.find((u) => /^https?:\/\//i.test(u));
+    if (mediaUrl) {
+      isVideo = /\.(mp4|mov|webm)(\?|$)/i.test(mediaUrl) || mediaUrl.includes("video");
       try {
-        const res = await fetch(imageUrl);
+        const res = await fetch(mediaUrl);
         if (res.ok) {
-          imageFile = {
+          mediaFile = {
             buffer: Buffer.from(await res.arrayBuffer()),
-            mimeType: res.headers.get("content-type") || "image/jpeg",
+            mimeType: res.headers.get("content-type") || (isVideo ? "video/mp4" : "image/jpeg"),
           };
         }
       } catch {
@@ -58,8 +62,12 @@ async function publishLinkedIn(params: {
 
   let mediaAssetUrn: string | null = null;
 
-  if (imageFile) {
+  if (mediaFile) {
     try {
+      const recipe = isVideo
+        ? "urn:li:digitalmediaRecipe:feedshare-video"
+        : "urn:li:digitalmediaRecipe:feedshare-image";
+
       const registerRes = await fetch("https://api.linkedin.com/v2/assets?action=registerUpload", {
         method: "POST",
         headers: {
@@ -69,7 +77,7 @@ async function publishLinkedIn(params: {
         },
         body: JSON.stringify({
           registerUploadRequest: {
-            recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
+            recipes: [recipe],
             owner: authorUrn,
             supportedUploadMechanisms: ["SYNCHRONOUS_UPLOAD"],
           },
@@ -78,26 +86,25 @@ async function publishLinkedIn(params: {
 
       const registerData = await registerRes.json();
       if (!registerRes.ok || !registerData.value?.uploadMechanism?.["com.linkedin.ads.common.S3UploadMechanism"]?.uploadUrl) {
-        throw new Error(registerData.message || "Görsel yükleme kaydı başarısız");
+        throw new Error(registerData.message || "Medya yükleme kaydı başarısız");
       }
 
       const uploadUrl = registerData.value.uploadMechanism["com.linkedin.ads.common.S3UploadMechanism"].uploadUrl;
       mediaAssetUrn = registerData.value.asset;
 
-      // Trigger Vercel redeployment to apply env changes
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: {
-          "Content-Type": imageFile.mimeType || "image/jpeg",
+          "Content-Type": mediaFile.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
         },
-        body: imageFile.buffer as any,
+        body: mediaFile.buffer as any,
       });
 
       if (!uploadRes.ok) {
-        throw new Error("Görsel binary yükleme başarısız");
+        throw new Error("Medya binary yükleme başarısız");
       }
     } catch (err) {
-      console.error("[linkedin-publish] image upload failed, falling back to link sharing:", err);
+      console.error("[linkedin-publish] media upload failed:", err);
       mediaAssetUrn = null;
     }
   }
@@ -108,7 +115,7 @@ async function publishLinkedIn(params: {
     specificContent: {
       "com.linkedin.ugc.ShareContent": {
         shareCommentary: { text: params.content },
-        shareMediaCategory: mediaAssetUrn ? "IMAGE" : "NONE",
+        shareMediaCategory: mediaAssetUrn ? (isVideo ? "VIDEO" : "IMAGE") : "NONE",
       },
     },
     visibility: {
@@ -121,12 +128,14 @@ async function publishLinkedIn(params: {
       {
         status: "READY",
         media: mediaAssetUrn,
-        title: { text: "SocialMarka Post" },
+        title: { text: isVideo ? "SocialMarka Video" : "SocialMarka Post" },
       },
     ];
   } else {
+    // Only append link if it's an article/web link, NOT a media file (video/image URL)
     const firstUrl = params.mediaUrls?.find((u) => /^https?:\/\//i.test(u));
-    if (firstUrl && !params.content.includes(firstUrl)) {
+    const isDirectMediaUrl = firstUrl && /\.(mp4|mov|webm|png|jpe?g|gif|webp)(\?|$)/i.test(firstUrl);
+    if (firstUrl && !isDirectMediaUrl && !params.content.includes(firstUrl)) {
       body.specificContent["com.linkedin.ugc.ShareContent"].shareCommentary.text =
         `${params.content}\n\n${firstUrl}`.trim();
     }
