@@ -447,6 +447,14 @@ export function PostsWorkspace({
           onConfirm={() => void confirmDeletePost()}
           onCancel={() => setDeleteConfirmId(null)}
         />
+        {busy && (
+          <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-ink-950/60">
+            <div className="flex items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-xl dark:bg-ink-900 border border-ink-100 dark:border-ink-800">
+               <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-accent border-t-transparent"></div>
+               <span className="text-sm font-semibold text-ink-700 dark:text-ink-200">Lütfen bekleyin...</span>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -588,6 +596,14 @@ export function PostsWorkspace({
         onConfirm={() => void confirmDeletePost()}
         onCancel={() => setDeleteConfirmId(null)}
       />
+      {busy && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-ink-950/60">
+          <div className="flex items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-xl dark:bg-ink-900 border border-ink-100 dark:border-ink-800">
+             <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-accent border-t-transparent"></div>
+             <span className="text-sm font-semibold text-ink-700 dark:text-ink-200">Lütfen bekleyin...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -323,14 +323,6 @@ export function InboxClient({
             <span>{syncStatus}</span>
             <button type="button" onClick={() => setSyncStatus(null)} className="font-bold hover:text-sky-900 ml-2">✕</button>
           </div>
-          {debugLogs && debugLogs.length > 0 && (
-            <details className="mt-1 cursor-pointer">
-              <summary className="font-semibold select-none text-[10px] text-sky-600 hover:text-sky-800">Senkronizasyon Logları (Detay)</summary>
-              <pre className="mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white dark:bg-slate-900 border border-sky-100 p-2 font-mono text-[9px] leading-relaxed text-slate-600">
-                {debugLogs.join("\n")}
-              </pre>
-            </details>
-          )}
         </div>
       )}
 
