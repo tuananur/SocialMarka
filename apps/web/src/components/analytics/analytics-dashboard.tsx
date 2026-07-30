@@ -21,6 +21,13 @@ import { tr } from "date-fns/locale";
 import { Button, Card } from "@heroui/react";
 import { ProviderIcon } from "@/components/posts/provider-icon";
 import { exportAnalyticsToCSV } from "@/lib/analytics-export";
+import {
+  InstagramReportSection,
+  FacebookReportSection,
+  XReportSection,
+  LinkedInReportSection,
+  YouTubeReportSection,
+} from "./platform-report-sections";
 
 type AccountOption = {
   id: string;
@@ -414,6 +421,10 @@ export function AnalyticsDashboard({
       : platform !== "ALL"
         ? PLATFORM_LABEL[platform] || platform
         : "Tüm hesaplar";
+
+  const [reportTab, setReportTab] = useState<
+    "OVERVIEW" | "INSTAGRAM" | "FACEBOOK" | "X" | "LINKEDIN" | "YOUTUBE"
+  >("OVERVIEW");
 
   return (
     <div className="min-w-0 space-y-6">
@@ -849,90 +860,189 @@ export function AnalyticsDashboard({
               </button>
             </div>
 
+            {/* Modal Navigation Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-ink-100 py-3 dark:border-ink-800">
+              <button
+                type="button"
+                onClick={() => setReportTab("OVERVIEW")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  reportTab === "OVERVIEW"
+                    ? "bg-accent text-white shadow-xs"
+                    : "bg-ink-50 text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:text-ink-300"
+                }`}
+              >
+                🌐 Genel Özet
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab("INSTAGRAM")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  reportTab === "INSTAGRAM"
+                    ? "bg-fuchsia-600 text-white shadow-xs"
+                    : "bg-ink-50 text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:text-ink-300"
+                }`}
+              >
+                <ProviderIcon provider="INSTAGRAM" size={14} />
+                <span>Instagram</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab("FACEBOOK")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  reportTab === "FACEBOOK"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-ink-50 text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:text-ink-300"
+                }`}
+              >
+                <ProviderIcon provider="FACEBOOK" size={14} />
+                <span>Meta / Facebook</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab("X")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  reportTab === "X"
+                    ? "bg-black text-white shadow-xs"
+                    : "bg-ink-50 text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:text-ink-300"
+                }`}
+              >
+                <ProviderIcon provider="X" size={14} />
+                <span>X (Twitter)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab("LINKEDIN")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  reportTab === "LINKEDIN"
+                    ? "bg-sky-700 text-white shadow-xs"
+                    : "bg-ink-50 text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:text-ink-300"
+                }`}
+              >
+                <ProviderIcon provider="LINKEDIN" size={14} />
+                <span>LinkedIn</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportTab("YOUTUBE")}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  reportTab === "YOUTUBE"
+                    ? "bg-red-600 text-white shadow-xs"
+                    : "bg-ink-50 text-ink-700 hover:bg-ink-100 dark:bg-ink-900 dark:text-ink-300"
+                }`}
+              >
+                <ProviderIcon provider="YOUTUBE" size={14} />
+                <span>YouTube</span>
+              </button>
+            </div>
+
             {/* Modal Content / Printable Area */}
             <div className="space-y-5 py-4">
-              {/* Executive Summary Metrics Grid */}
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
-                  Genel Performans Özeti
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
-                    <p className="text-xs text-ink-500">Toplam Takipçi</p>
-                    <p className="text-lg font-bold text-ink-900 tabular-nums">
-                      {totals.followers.toLocaleString("tr-TR")}
+              {reportTab === "OVERVIEW" && (
+                <>
+                  {/* Executive Summary Metrics Grid */}
+                  <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                      Genel Performans Özeti
                     </p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                        <p className="text-xs text-ink-500">Toplam Takipçi</p>
+                        <p className="text-lg font-bold text-ink-900 tabular-nums">
+                          {totals.followers.toLocaleString("tr-TR")}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                        <p className="text-xs text-ink-500">Etkileşim Oranı</p>
+                        <p className="text-lg font-bold text-accent tabular-nums">
+                          {totals.engagementRate.toFixed(2)}%
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                        <p className="text-xs text-ink-500">Toplam Gösterim</p>
+                        <p className="text-lg font-bold text-ink-900 tabular-nums">
+                          {totals.impressions.toLocaleString("tr-TR")}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                        <p className="text-xs text-ink-500">Toplam Beğeni</p>
+                        <p className="text-lg font-bold text-ink-900 tabular-nums">
+                          {totals.likes.toLocaleString("tr-TR")}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
-                    <p className="text-xs text-ink-500">Etkileşim Oranı</p>
-                    <p className="text-lg font-bold text-accent tabular-nums">
-                      {totals.engagementRate.toFixed(2)}%
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
-                    <p className="text-xs text-ink-500">Toplam Gösterim</p>
-                    <p className="text-lg font-bold text-ink-900 tabular-nums">
-                      {totals.impressions.toLocaleString("tr-TR")}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
-                    <p className="text-xs text-ink-500">Toplam Beğeni</p>
-                    <p className="text-lg font-bold text-ink-900 tabular-nums">
-                      {totals.likes.toLocaleString("tr-TR")}
-                    </p>
-                  </div>
-                </div>
-              </div>
 
-              {/* Popular Hashtags Summary in Report */}
-              {popularHashtags.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
-                    Öne Çıkan Popüler Hashtag'ler
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {popularHashtags.slice(0, 10).map((h) => (
-                      <span
-                        key={h.tag}
-                        className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800"
-                      >
-                        {h.tag} ({h.count})
-                      </span>
-                    ))}
+                  {/* Popular Hashtags Summary in Report */}
+                  {popularHashtags.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                        Öne Çıkan Popüler Hashtag'ler
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {popularHashtags.slice(0, 10).map((h) => (
+                          <span
+                            key={h.tag}
+                            className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800"
+                          >
+                            {h.tag} ({h.count})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detailed Post Performance Table in Report */}
+                  <div>
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                      Gönderi Performans Detayları
+                    </p>
+                    <div className="overflow-hidden rounded-xl border border-ink-100">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-ink-50 text-ink-600 font-semibold">
+                          <tr>
+                            <th className="p-2.5">Gönderi</th>
+                            <th className="p-2.5">Platform</th>
+                            <th className="p-2.5">Erişim</th>
+                            <th className="p-2.5">Etkileşim</th>
+                            <th className="p-2.5">Beğeni</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink-100">
+                          {detailedPostPerformance.slice(0, 10).map((p) => (
+                            <tr key={p.id}>
+                              <td className="p-2.5 font-medium text-ink-900 max-w-[200px] truncate">{p.content}</td>
+                              <td className="p-2.5">{PLATFORM_LABEL[p.provider] || p.provider}</td>
+                              <td className="p-2.5 tabular-nums">{p.reach}</td>
+                              <td className="p-2.5 tabular-nums font-semibold text-accent">{p.engagementRate}</td>
+                              <td className="p-2.5 tabular-nums">{p.reactions}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
 
-              {/* Detailed Post Performance Table in Report */}
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
-                  Gönderi Performans Detayları
-                </p>
-                <div className="overflow-hidden rounded-xl border border-ink-100">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-ink-50 text-ink-600 font-semibold">
-                      <tr>
-                        <th className="p-2.5">Gönderi</th>
-                        <th className="p-2.5">Platform</th>
-                        <th className="p-2.5">Erişim</th>
-                        <th className="p-2.5">Etkileşim</th>
-                        <th className="p-2.5">Beğeni</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ink-100">
-                      {detailedPostPerformance.slice(0, 10).map((p) => (
-                        <tr key={p.id}>
-                          <td className="p-2.5 font-medium text-ink-900 max-w-[200px] truncate">{p.content}</td>
-                          <td className="p-2.5">{PLATFORM_LABEL[p.provider] || p.provider}</td>
-                          <td className="p-2.5 tabular-nums">{p.reach}</td>
-                          <td className="p-2.5 tabular-nums font-semibold text-accent">{p.engagementRate}</td>
-                          <td className="p-2.5 tabular-nums">{p.reactions}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {reportTab === "INSTAGRAM" && (
+                <InstagramReportSection snapshots={snapshots} posts={posts} />
+              )}
+
+              {reportTab === "FACEBOOK" && (
+                <FacebookReportSection snapshots={snapshots} posts={posts} />
+              )}
+
+              {reportTab === "X" && (
+                <XReportSection snapshots={snapshots} posts={posts} />
+              )}
+
+              {reportTab === "LINKEDIN" && (
+                <LinkedInReportSection snapshots={snapshots} posts={posts} />
+              )}
+
+              {reportTab === "YOUTUBE" && (
+                <YouTubeReportSection snapshots={snapshots} posts={posts} />
+              )}
             </div>
 
             {/* Modal Actions */}
