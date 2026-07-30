@@ -147,7 +147,7 @@ export function FibaSlideReport({
           <Button
             size="sm"
             variant="outline"
-            disabled={currentSlide === 1}
+            isDisabled={currentSlide === 1}
             onPress={prevSlide}
             className="text-xs border-slate-700 text-slate-300 disabled:opacity-30"
           >
