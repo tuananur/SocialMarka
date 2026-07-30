@@ -278,7 +278,7 @@ export function ComposerShell({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="relative fixed inset-x-0 bottom-0 top-14 z-[25] flex flex-col bg-[#f3f5f7] dark:bg-ink-50 md:left-[15.5rem]"
+      className="fixed inset-x-0 bottom-0 top-14 z-[25] flex flex-col bg-[#f3f5f7] dark:bg-ink-50 md:left-[15.5rem]"
     >
       {isDragging ? (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-accent/90 backdrop-blur-xs text-white border-4 border-dashed border-white m-4 rounded-3xl animate-in fade-in duration-150">
