@@ -220,8 +220,75 @@ export function ComposerShell({
   const scheduleDisabled = !canEdit || busy || !composer.actionGates.schedule;
   const draftDisabled = !canEdit || busy || !composer.hasCaption;
 
+  async function addUrlMedia(inputUrl: string) {
+    if (!canEdit) return;
+    const url = inputUrl.trim();
+    if (!url) return;
+    try {
+      const res = await fetch("/api/uploads/url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, postId: composer.editingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Medya eklenemedi");
+      composer.setMediaItems((prev) => [
+        ...prev,
+        {
+          assetId: data.assetId,
+          url: data.publicUrl,
+          mimeType: data.mimeType,
+          fileName: null,
+        },
+      ]);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Medya eklenemedi");
+    }
+  }
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (canEdit && !busy && !isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isDragging) setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (!canEdit || busy) return;
+    const files = Array.from(e.dataTransfer.files).filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/"),
+    );
+    if (files.length > 0) {
+      void onUploadFiles(files);
+    }
+  };
+
   return (
-    <div className="fixed inset-x-0 bottom-0 top-14 z-[25] flex flex-col bg-[#f3f5f7] dark:bg-ink-50 md:left-[15.5rem]">
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="relative fixed inset-x-0 bottom-0 top-14 z-[25] flex flex-col bg-[#f3f5f7] dark:bg-ink-50 md:left-[15.5rem]"
+    >
+      {isDragging ? (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-accent/90 backdrop-blur-xs text-white border-4 border-dashed border-white m-4 rounded-3xl animate-in fade-in duration-150">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-inner mb-3">
+            📁
+          </div>
+          <p className="text-lg font-bold">Görsel veya Video Yüklemek İçin Bırakın</p>
+          <p className="text-xs text-white/80 mt-1">Dosyalarınız otomatik olarak gönderinize eklenecektir</p>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-200/80 bg-white px-4 py-0">
         <div className="flex items-center gap-0">
           <span className="relative px-4 py-3.5 text-sm font-semibold text-ink-900">
@@ -434,6 +501,7 @@ export function ComposerShell({
               utmCampaign={composer.utmCampaign}
               setUtmCampaign={composer.setUtmCampaign}
               onMediaClick={() => fileInputRef.current?.click()}
+              onAddUrlMedia={addUrlMedia}
               onInsertHashtag={() => composer.insertIntoDraft(" #")}
               onInsertEmoji={(e) => composer.insertIntoDraft(e)}
               onAiCaption={composer.applyAiCaption}

@@ -97,6 +97,9 @@ function googleErrorMessage(raw: string, status: number): string {
     };
     const msg = parsed.error?.message;
     const reason = parsed.error?.errors?.[0]?.reason;
+    if (reason === "youtubeSignupRequired") {
+      return "Seçilen Google hesabında henüz oluşturulmuş aktif bir YouTube kanalı yok. Lütfen youtube.com üzerinden kanal oluşturun veya kanalı olan hesabı bağlayın.";
+    }
     if (msg && reason) return `${msg} (${reason})`;
     if (msg) return msg;
   } catch {
