@@ -75,6 +75,8 @@ export async function GET(req: Request) {
       processedPosts: scheduledPosts.length,
       results,
     });
+  } catch (err: any) {
+    console.error("[CRON TRIGGER ERROR]:", err);
     return NextResponse.json({ error: err?.message || "Internal server error" }, { status: 500 });
   }
 }
