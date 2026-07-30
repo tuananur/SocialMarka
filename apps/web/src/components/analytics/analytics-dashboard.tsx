@@ -83,6 +83,32 @@ const PLATFORM_COLOR: Record<string, string> = {
   FACEBOOK: "#1877F2",
 };
 
+function PostThumbnail({ url, provider }: { url?: string; provider: string }) {
+  const [failed, setFailed] = useState(false);
+  const isDirectImage =
+    url &&
+    (url.startsWith("http://") ||
+      url.startsWith("https://") ||
+      url.startsWith("data:image"));
+
+  if (url && isDirectImage && !failed) {
+    return (
+      <img
+        src={url}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-14 w-14 rounded-lg object-cover bg-ink-100 shrink-0 border border-ink-200/60"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-gradient-to-br from-brand-100 to-sky-100 dark:from-ink-800 dark:to-ink-900 border border-ink-200/60 text-ink-700">
+      <ProviderIcon provider={provider} size={24} />
+    </div>
+  );
+}
+
 export function AnalyticsDashboard({
   accounts,
   posts,
@@ -100,6 +126,7 @@ export function AnalyticsDashboard({
   const [platform, setPlatform] = useState<string>("ALL");
   const [accountId, setAccountId] = useState<string>("ALL");
   const [range, setRange] = useState<"7" | "30" | "all" | "custom">("30");
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
     const d = subDays(new Date(), 30);
@@ -285,19 +312,6 @@ export function AnalyticsDashboard({
     return buckets;
   }, [filteredPosts]);
 
-  const peakHour = useMemo(() => {
-    let max = -1;
-    let peak = "18:00 - 21:00";
-    for (const b of hourly) {
-      if (b.count > max) {
-        max = b.count;
-        const hNum = parseInt(b.hour, 10);
-        peak = `${String(hNum).padStart(2, "0")}:00 - ${String((hNum + 2) % 24).padStart(2, "0")}:00`;
-      }
-    }
-    return peak;
-  }, [hourly]);
-
   const weekly = useMemo(() => {
     const days = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
     const counts = Array(7).fill(0);
@@ -328,7 +342,7 @@ export function AnalyticsDashboard({
 
   return (
     <div className="min-w-0 space-y-6">
-      {/* Top Header & Export */}
+      {/* Top Header & Actions */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-400">
@@ -380,8 +394,17 @@ export function AnalyticsDashboard({
 
           <Button
             size="sm"
+            variant="primary"
+            className="font-semibold bg-accent text-white shadow-sm hover:opacity-90"
+            onPress={() => setShowReportModal(true)}
+          >
+            📄 Rapor Hazırla
+          </Button>
+
+          <Button
+            size="sm"
             variant="outline"
-            className="font-semibold text-accent border-accent/30 hover:bg-sky-50"
+            className="font-semibold text-ink-700 border-ink-200 bg-white hover:bg-ink-50"
             onPress={() => {
               exportAnalyticsToCSV(
                 tableRows.map((r) => ({
@@ -398,7 +421,7 @@ export function AnalyticsDashboard({
               );
             }}
           >
-            📥 Rapor İndir (CSV)
+            📥 CSV İndir
           </Button>
         </div>
       </div>
@@ -481,25 +504,6 @@ export function AnalyticsDashboard({
         <Metric label="Yayınlanan Gönderi" value={totals.totalPosts} hint="Filtrelenmiş aralık" />
       </div>
 
-      {/* AI Peak Hours & Insights Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-amber-300/60 bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-100/40 p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md text-lg">
-            ⚡
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-amber-950">AI Paylaşım Zamanı Önerisi</h3>
-            <p className="text-xs text-amber-900/80 mt-0.5">
-              Hesaplarınızın aktiflik verilerine göre takipçilerinizin en yoğun olduğu saat aralığı:{" "}
-              <strong className="font-bold text-amber-950 underline">{peakHour}</strong>
-            </p>
-          </div>
-        </div>
-        <div className="rounded-xl bg-white/80 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-2xs">
-          En Yüksek Etkileşim Saati
-        </div>
-      </div>
-
       {/* Top Posts & Platform Distribution Row */}
       <div className="grid gap-4 xl:grid-cols-3">
         {/* Platform Distribution Donut Chart */}
@@ -558,17 +562,7 @@ export function AnalyticsDashboard({
                       key={post.id}
                       className="flex items-start gap-3 rounded-xl border border-ink-100 bg-ink-50/50 p-3 transition hover:border-ink-200"
                     >
-                      {mediaUrl ? (
-                        <img
-                          src={mediaUrl}
-                          alt=""
-                          className="h-14 w-14 rounded-lg object-cover bg-ink-200 shrink-0"
-                        />
-                      ) : (
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent/20 to-accent/40 text-accent font-bold text-xs">
-                          POST
-                        </div>
-                      )}
+                      <PostThumbnail url={mediaUrl} provider={provider} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 mb-1">
                           <ProviderIcon provider={provider} size={16} />
@@ -576,7 +570,7 @@ export function AnalyticsDashboard({
                             {firstTarget?.socialAccount?.accountName || PLATFORM_LABEL[provider]}
                           </span>
                         </div>
-                        <p className="line-clamp-2 text-xs text-ink-800 leading-snug">
+                        <p className="line-clamp-2 text-xs text-ink-800 leading-snug font-medium">
                           {post.content || "Görsel paylaşımı"}
                         </p>
                         <p className="mt-1 text-[10px] text-ink-400">
@@ -764,6 +758,181 @@ export function AnalyticsDashboard({
           )}
         </Card.Content>
       </Card>
+
+      {/* Executive Performance Report Modal */}
+      {showReportModal ? (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs"
+            onClick={() => setShowReportModal(false)}
+          />
+          <div className="fixed left-1/2 top-1/2 z-51 w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto rounded-2xl border border-ink-200 bg-white p-6 shadow-2xl dark:bg-ink-950 dark:border-ink-800">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-ink-100 pb-4 dark:border-ink-800">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white font-bold text-lg shadow-sm">
+                  SM
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-ink-900 dark:text-white">
+                    SocialMarka - Sosyal Medya Performans Raporu
+                  </h2>
+                  <p className="text-xs text-ink-500">
+                    Oluşturulma Tarihi: {new Date().toLocaleDateString("tr-TR")} · Filtre: {selectedLabel}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="rounded-lg p-2 text-ink-400 hover:bg-ink-100 hover:text-ink-800 dark:hover:bg-ink-900"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content / Printable Area */}
+            <div className="space-y-5 py-4">
+              {/* Executive Summary Metrics Grid */}
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                  Genel Performans Özeti
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                    <p className="text-xs text-ink-500">Toplam Takipçi</p>
+                    <p className="text-lg font-bold text-ink-900 tabular-nums">
+                      {totals.followers.toLocaleString("tr-TR")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                    <p className="text-xs text-ink-500">Etkileşim Oranı</p>
+                    <p className="text-lg font-bold text-accent tabular-nums">
+                      {totals.engagementRate.toFixed(2)}%
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                    <p className="text-xs text-ink-500">Toplam Gösterim</p>
+                    <p className="text-lg font-bold text-ink-900 tabular-nums">
+                      {totals.impressions.toLocaleString("tr-TR")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                    <p className="text-xs text-ink-500">Toplam Beğeni</p>
+                    <p className="text-lg font-bold text-ink-900 tabular-nums">
+                      {totals.likes.toLocaleString("tr-TR")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Accounts Breakdown Table */}
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                  Bağlı Hesaplar Özeti
+                </p>
+                <div className="overflow-hidden rounded-xl border border-ink-100">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-ink-50 text-ink-600 font-semibold">
+                      <tr>
+                        <th className="p-2.5">Hesap</th>
+                        <th className="p-2.5">Platform</th>
+                        <th className="p-2.5">Takipçi</th>
+                        <th className="p-2.5">Gösterim</th>
+                        <th className="p-2.5">Beğeni</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink-100">
+                      {latestByAccount.map((a) => (
+                        <tr key={a.accountId}>
+                          <td className="p-2.5 font-medium text-ink-900">{a.accountName}</td>
+                          <td className="p-2.5">{PLATFORM_LABEL[a.provider] || a.provider}</td>
+                          <td className="p-2.5 tabular-nums">{a.followers.toLocaleString("tr-TR")}</td>
+                          <td className="p-2.5 tabular-nums">{a.impressions.toLocaleString("tr-TR")}</td>
+                          <td className="p-2.5 tabular-nums">{a.likes.toLocaleString("tr-TR")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Top Posts Section */}
+              {topPosts.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                    Öne Çıkan Gönderiler
+                  </p>
+                  <div className="space-y-2">
+                    {topPosts.map((post) => (
+                      <div
+                        key={post.id}
+                        className="flex items-center justify-between rounded-xl border border-ink-100 p-2.5 text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <ProviderIcon
+                            provider={post.targets?.[0]?.socialAccount?.provider || "INSTAGRAM"}
+                            size={18}
+                          />
+                          <span className="truncate font-medium text-ink-800">
+                            {post.content || "Görsel gönderisi"}
+                          </span>
+                        </div>
+                        <span className="text-ink-400 shrink-0 ml-2">
+                          {format(new Date(post.createdAt), "d MMM yyyy", { locale: tr })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 border-t border-ink-100 pt-4 dark:border-ink-800">
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => setShowReportModal(false)}
+              >
+                Kapat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-semibold text-ink-700"
+                onPress={() => {
+                  exportAnalyticsToCSV(
+                    tableRows.map((r) => ({
+                      date: r.capturedAt,
+                      accountName: r.accountName,
+                      provider: r.provider,
+                      followers: r.followers,
+                      following: r.following,
+                      impressions: r.impressions,
+                      reach: r.reach,
+                      likes: r.likes,
+                      comments: r.comments,
+                    }))
+                  );
+                }}
+              >
+                📥 CSV İndir
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                className="bg-accent font-semibold text-white shadow-sm hover:opacity-90"
+                onPress={() => {
+                  window.print();
+                }}
+              >
+                🖨️ Yazdır / PDF Kaydet
+              </Button>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
