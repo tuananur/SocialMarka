@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { subDays } from "date-fns";
 import {
   Bar,
   BarChart,
@@ -91,42 +92,74 @@ function PhoneMockupFrame({
 /* -------------------------------------------------------------------------- */
 /* FIBA SLIDE REPORT COMPONENT (25 SLIDES)                                    */
 /* -------------------------------------------------------------------------- */
+function toDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function FibaSlideReport({
   snapshots,
   posts,
   workspaceName = "SocialMarka",
+  reportSince,
+  reportUntil,
   onClose,
 }: {
   snapshots: Snapshot[];
   posts: Post[];
   workspaceName?: string;
+  reportSince?: Date;
+  reportUntil?: Date;
   onClose: () => void;
 }) {
   const [currentSlide, setCurrentSlide] = useState(1);
   const totalSlides = 25;
+  const [reportRange, setReportRange] = useState<"7" | "30" | "custom">("30");
+  const [customStart, setCustomStart] = useState(toDateStr(reportSince ?? subDays(new Date(), 30)));
+  const [customEnd, setCustomEnd] = useState(toDateStr(reportUntil ?? new Date()));
+
+  const { since, until } = useMemo(() => {
+    if (reportRange === "7") return { since: subDays(new Date(), 7), until: new Date() };
+    if (reportRange === "30") return { since: subDays(new Date(), 30), until: new Date() };
+    return {
+      since: customStart ? new Date(customStart + "T00:00:00") : subDays(new Date(), 30),
+      until: customEnd ? new Date(customEnd + "T23:59:59") : new Date(),
+    };
+  }, [reportRange, customStart, customEnd]);
+
+  const filteredSnapshots = useMemo(() =>
+    snapshots.filter((s) => { const d = new Date(s.capturedAt); return d >= since && d <= until; }),
+    [snapshots, since, until]
+  );
+
+  const filteredPosts = useMemo(() =>
+    posts.filter((p) => { const d = new Date(p.scheduledAt || p.createdAt); return d >= since && d <= until; }),
+    [posts, since, until]
+  );
 
   const nextSlide = () => setCurrentSlide((prev) => Math.min(prev + 1, totalSlides));
   const prevSlide = () => setCurrentSlide((prev) => Math.max(prev - 1, 1));
 
-  // Live Data Calculations
-  const igSnapshots = useMemo(() => snapshots.filter((s) => s.provider === "INSTAGRAM"), [snapshots]);
-  const fbSnapshots = useMemo(() => snapshots.filter((s) => s.provider === "FACEBOOK"), [snapshots]);
-  const xSnapshots = useMemo(() => snapshots.filter((s) => s.provider === "X"), [snapshots]);
-  const liSnapshots = useMemo(() => snapshots.filter((s) => s.provider === "LINKEDIN"), [snapshots]);
-  const ytSnapshots = useMemo(() => snapshots.filter((s) => s.provider === "YOUTUBE"), [snapshots]);
+  // Live Data Calculations — using date-filtered snapshots
+  const igSnapshots = useMemo(() => filteredSnapshots.filter((s) => s.provider === "INSTAGRAM"), [filteredSnapshots]);
+  const fbSnapshots = useMemo(() => filteredSnapshots.filter((s) => s.provider === "FACEBOOK"), [filteredSnapshots]);
+  const xSnapshots = useMemo(() => filteredSnapshots.filter((s) => s.provider === "X"), [filteredSnapshots]);
+  const liSnapshots = useMemo(() => filteredSnapshots.filter((s) => s.provider === "LINKEDIN"), [filteredSnapshots]);
+  const ytSnapshots = useMemo(() => filteredSnapshots.filter((s) => s.provider === "YOUTUBE"), [filteredSnapshots]);
 
-  const igFollowers = igSnapshots[0]?.followers || 173;
-  const igImpressions = igSnapshots.reduce((s, x) => s + x.impressions, 0) || 1313478;
-  const igReach = igSnapshots.reduce((s, x) => s + x.reach, 0) || 557652;
+  const igFollowers = igSnapshots[0]?.followers || 0;
+  const igImpressions = igSnapshots.reduce((s, x) => s + x.impressions, 0);
+  const igReach = igSnapshots.reduce((s, x) => s + x.reach, 0);
 
-  const fbImpressions = fbSnapshots.reduce((s, x) => s + x.impressions, 0) || 865;
-  const fbReach = fbSnapshots.reduce((s, x) => s + x.reach, 0) || 4610000;
+  const fbImpressions = fbSnapshots.reduce((s, x) => s + x.impressions, 0);
+  const fbReach = fbSnapshots.reduce((s, x) => s + x.reach, 0);
 
-  const liFollowers = liSnapshots[0]?.followers || 258;
-  const liImpressions = liSnapshots.reduce((s, x) => s + x.impressions, 0) || 7300;
+  const liFollowers = liSnapshots[0]?.followers || 0;
+  const liImpressions = liSnapshots.reduce((s, x) => s + x.impressions, 0);
 
-  const ytViews = ytSnapshots.reduce((s, x) => s + x.impressions, 0) || 709315;
-  const ytSubscribers = 27;
+  const ytViews = ytSnapshots.reduce((s, x) => s + x.impressions, 0);
+  const ytSubscribers = ytSnapshots[0]?.followers || 0;
+
+  const rangeDateLabel = `${since.toLocaleDateString("tr-TR")} — ${until.toLocaleDateString("tr-TR")}`;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white overflow-hidden">
@@ -138,8 +171,33 @@ export function FibaSlideReport({
           </div>
           <div>
             <h2 className="text-sm font-bold tracking-tight">{workspaceName} — SOSYAL MEDYA RAPORU</h2>
-            <p className="text-[11px] text-slate-400">Slayt {currentSlide} / {totalSlides} · 16:9 Kurumsal Sunum</p>
+            <p className="text-[11px] text-slate-400">Slayt {currentSlide} / {totalSlides} · {rangeDateLabel}</p>
           </div>
+        </div>
+
+        {/* Date Range Picker for Report */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 p-0.5">
+            {(["7", "30", "custom"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setReportRange(r)}
+                className={`rounded-md px-3 py-1 text-[11px] font-semibold transition ${reportRange === r ? "bg-white text-slate-900" : "text-slate-400 hover:text-white"}`}
+              >
+                {r === "7" ? "Son 7 gün" : r === "30" ? "Son 30 gün" : "Özel"}
+              </button>
+            ))}
+          </div>
+          {reportRange === "custom" && (
+            <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1">
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
+                className="bg-transparent text-[11px] text-white outline-none" />
+              <span className="text-slate-600">—</span>
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
+                className="bg-transparent text-[11px] text-white outline-none" />
+            </div>
+          )}
         </div>
 
         {/* Slide Navigation Buttons */}
@@ -456,7 +514,6 @@ export function FibaSlideReport({
             </div>
           )}
 
-          {/* SLIDE 12-15: META / FACEBOOK SLIDES */}
           {currentSlide >= 12 && currentSlide <= 15 && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
@@ -465,22 +522,21 @@ export function FibaSlideReport({
               </div>
               <div className="grid grid-cols-3 gap-4 text-xs">
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
-                  <p className="text-slate-400">Gönderi Gösterim Trendi</p>
-                  <p className="text-2xl font-bold text-emerald-400 mt-1">↑ 459.58%</p>
-                </div>
-                <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
                   <p className="text-slate-400">Sayfa Gösterimleri</p>
-                  <p className="text-2xl font-bold text-blue-400 mt-1">865</p>
+                  <p className="text-2xl font-bold text-blue-400 mt-1">{fbImpressions.toLocaleString("tr-TR")}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
                   <p className="text-slate-400">Sayfa Erişimi</p>
-                  <p className="text-2xl font-bold text-indigo-400 mt-1">4.61M</p>
+                  <p className="text-2xl font-bold text-indigo-400 mt-1">{fbReach >= 1000000 ? `${(fbReach / 1000000).toFixed(2)}M` : fbReach.toLocaleString("tr-TR")}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
+                  <p className="text-slate-400">Facebook Takipçileri</p>
+                  <p className="text-2xl font-bold text-white mt-1">{fbSnapshots[0]?.followers?.toLocaleString("tr-TR") || 0}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* SLIDE 16-18: X (TWITTER) SLIDES */}
           {currentSlide >= 16 && currentSlide <= 18 && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
@@ -490,21 +546,20 @@ export function FibaSlideReport({
               <div className="grid grid-cols-3 gap-4 text-xs">
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
                   <p className="text-slate-400">Takipçiler</p>
-                  <p className="text-2xl font-bold text-white mt-1">264</p>
+                  <p className="text-2xl font-bold text-white mt-1">{xSnapshots[0]?.followers?.toLocaleString("tr-TR") || 0}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
-                  <p className="text-slate-400">Retweetler</p>
-                  <p className="text-2xl font-bold text-sky-400 mt-1">3</p>
+                  <p className="text-slate-400">Gösterimler</p>
+                  <p className="text-2xl font-bold text-sky-400 mt-1">{xSnapshots.reduce((s, x) => s + x.impressions, 0).toLocaleString("tr-TR")}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
-                  <p className="text-slate-400">Favoriler (Likes)</p>
-                  <p className="text-2xl font-bold text-rose-500 mt-1">9</p>
+                  <p className="text-slate-400">Etkileşimler</p>
+                  <p className="text-2xl font-bold text-rose-500 mt-1">{xSnapshots.reduce((s, x) => s + x.likes + x.comments, 0)}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* SLIDE 19-21: LINKEDIN SLIDES */}
           {currentSlide >= 19 && currentSlide <= 21 && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
@@ -514,21 +569,20 @@ export function FibaSlideReport({
               <div className="grid grid-cols-3 gap-4 text-xs">
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
                   <p className="text-slate-400">Toplam Takipçi</p>
-                  <p className="text-2xl font-bold text-sky-400 mt-1">258 ↑ 50</p>
+                  <p className="text-2xl font-bold text-sky-400 mt-1">{liFollowers.toLocaleString("tr-TR")}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
                   <p className="text-slate-400">Toplam Gösterim</p>
-                  <p className="text-2xl font-bold text-white mt-1">7.3K ↑ 4.12%</p>
+                  <p className="text-2xl font-bold text-white mt-1">{liImpressions >= 1000 ? `${(liImpressions / 1000).toFixed(1)}K` : liImpressions}</p>
                 </div>
                 <div className="rounded-2xl bg-slate-800 p-4 border border-slate-700">
-                  <p className="text-slate-400">Sayfa Tıklamaları</p>
-                  <p className="text-2xl font-bold text-indigo-400 mt-1">442</p>
+                  <p className="text-slate-400">Toplam Etkileşim</p>
+                  <p className="text-2xl font-bold text-indigo-400 mt-1">{liSnapshots.reduce((s, x) => s + x.likes + x.comments, 0)}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* SLIDE 22-25: YOUTUBE SLIDES */}
           {currentSlide >= 22 && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
@@ -536,19 +590,21 @@ export function FibaSlideReport({
                 <h1 className="text-3xl sm:text-5xl font-black text-white uppercase">YOUTUBE</h1>
               </div>
               <div className="rounded-2xl bg-red-950/60 border border-red-800 p-5">
-                <h2 className="text-xl font-bold text-red-200">Kanalınız son 28 günde 709.315 kez izlendi</h2>
+                <h2 className="text-xl font-bold text-red-200">
+                  Kanalınız {rangeDateLabel} döneminde {ytViews.toLocaleString("tr-TR")} kez izlendi
+                </h2>
                 <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs">
                   <div className="bg-slate-900 p-3 rounded-xl border border-red-900/60">
                     <span className="text-slate-400">Görüntüleme</span>
-                    <span className="block text-xl font-bold text-red-400 mt-1">709,3 B</span>
+                    <span className="block text-xl font-bold text-red-400 mt-1">{ytViews >= 1000 ? `${(ytViews / 1000).toFixed(1)}K` : ytViews}</span>
                   </div>
                   <div className="bg-slate-900 p-3 rounded-xl border border-red-900/60">
-                    <span className="text-slate-400">İzlenme Süresi</span>
-                    <span className="block text-xl font-bold text-white mt-1">1,1 B saat</span>
+                    <span className="text-slate-400">Etkileşimler</span>
+                    <span className="block text-xl font-bold text-white mt-1">{ytSnapshots.reduce((s, x) => s + x.likes + x.comments, 0)}</span>
                   </div>
                   <div className="bg-slate-900 p-3 rounded-xl border border-red-900/60">
                     <span className="text-slate-400">Aboneler</span>
-                    <span className="block text-xl font-bold text-emerald-400 mt-1">+27</span>
+                    <span className="block text-xl font-bold text-emerald-400 mt-1">+{ytSubscribers}</span>
                   </div>
                 </div>
               </div>
