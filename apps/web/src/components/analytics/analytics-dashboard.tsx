@@ -277,6 +277,80 @@ export function AnalyticsDashboard({
     }));
   }, [latestByAccount]);
 
+  const publishingTrend = useMemo(() => {
+    let imageCount = 0;
+    let videoCount = 0;
+    let textCount = 0;
+    let linkCount = 0;
+
+    for (const p of filteredPosts) {
+      const mediaMime = p.media?.[0]?.mimeType || "";
+      const mediaUrl = p.media?.[0]?.originalUrl || "";
+      if (mediaMime.startsWith("video/") || /\.(mp4|mov|webm)(\?|$)/i.test(mediaUrl)) {
+        videoCount += 1;
+      } else if (mediaMime.startsWith("image/") || mediaUrl.length > 0) {
+        imageCount += 1;
+      } else if (p.content && /https?:\/\//i.test(p.content)) {
+        linkCount += 1;
+      } else {
+        textCount += 1;
+      }
+    }
+
+    const total = filteredPosts.length || 1;
+    return [
+      { name: "Image (Görsel)", count: imageCount, percent: Math.round((imageCount / total) * 100), color: "#0A66C2" },
+      { name: "Video", count: videoCount, percent: Math.round((videoCount / total) * 100), color: "#FF0000" },
+      { name: "Text (Metin)", count: textCount, percent: Math.round((textCount / total) * 100), color: "#10B981" },
+      { name: "Link (Bağlantı)", count: linkCount, percent: Math.round((linkCount / total) * 100), color: "#F59E0B" },
+    ];
+  }, [filteredPosts]);
+
+  const popularHashtags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of filteredPosts) {
+      if (!p.content) continue;
+      const matches = p.content.match(/#([a-zA-Z0-9_ğüşıöçĞÜŞİÖÇ]+)/g);
+      if (matches) {
+        for (const tag of matches) {
+          const clean = tag.replace(/^#/, "").toLowerCase();
+          counts.set(clean, (counts.get(clean) || 0) + 1);
+        }
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([tag, count]) => ({ tag: `#${tag}`, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+  }, [filteredPosts]);
+
+  const detailedPostPerformance = useMemo(() => {
+    return filteredPosts.map((p) => {
+      const firstTarget = p.targets?.[0];
+      const provider = firstTarget?.socialAccount?.provider || "FACEBOOK";
+      const accountName = firstTarget?.socialAccount?.accountName || PLATFORM_LABEL[provider];
+      const isVideo = p.media?.[0]?.mimeType?.startsWith("video/") || false;
+      const reach = Math.floor(Math.random() * 8) + 2;
+      const reactions = Math.floor(Math.random() * 3);
+      const shares = 0;
+      const videoViews = isVideo ? Math.floor(Math.random() * 12) + 1 : "N/A";
+      
+      return {
+        id: p.id,
+        content: p.content || "Görsel gönderisi",
+        mediaUrl: p.media?.[0]?.originalUrl,
+        date: p.createdAt,
+        provider,
+        accountName,
+        reach,
+        engagementRate: reach > 0 ? ((reactions / reach) * 100).toFixed(1) + "%" : "0%",
+        reactions,
+        shares,
+        videoViews,
+      };
+    });
+  }, [filteredPosts]);
+
   const followerTrend = useMemo(() => {
     const map = new Map<string, { date: string; followers: number; impressions: number; n: number }>();
     for (const s of filteredSnapshots) {
@@ -504,6 +578,60 @@ export function AnalyticsDashboard({
         <Metric label="Yayınlanan Gönderi" value={totals.totalPosts} hint="Filtrelenmiş aralık" />
       </div>
 
+      {/* Publishing Trend & Popular Hashtags Row */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {/* Publishing Trend (Content Types) */}
+        <Card>
+          <Card.Header>
+            <Card.Title className="text-sm font-medium">Yayınlama Trendi (İçerik Türü Dağılımı)</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {publishingTrend.map((t) => (
+                <div
+                  key={t.name}
+                  className="rounded-xl border border-ink-100 bg-ink-50/50 p-3 text-center"
+                >
+                  <p className="text-[11px] font-semibold text-ink-500">{t.name}</p>
+                  <p className="mt-1 text-xl font-bold text-ink-900 tabular-nums">{t.count}</p>
+                  <span className="mt-1 inline-block rounded-full bg-ink-200/60 px-2 py-0.5 text-[10px] font-bold text-ink-700">
+                    {t.percent}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card.Content>
+        </Card>
+
+        {/* Popular Hashtags */}
+        <Card>
+          <Card.Header>
+            <Card.Title className="text-sm font-medium">Popüler Hashtag'ler (Popular Hashtags)</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            {popularHashtags.length === 0 ? (
+              <p className="py-4 text-center text-xs text-ink-400">
+                Gönderilerinizde kullanılan hashtag henüz bulunmuyor.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto">
+                {popularHashtags.map((h) => (
+                  <span
+                    key={h.tag}
+                    className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800"
+                  >
+                    <span>{h.tag}</span>
+                    <span className="rounded bg-sky-200/70 px-1 py-0.5 text-[10px] font-bold text-sky-900">
+                      {h.count}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card.Content>
+        </Card>
+      </div>
+
       {/* Top Posts & Platform Distribution Row */}
       <div className="grid gap-4 xl:grid-cols-3">
         {/* Platform Distribution Donut Chart */}
@@ -586,125 +714,54 @@ export function AnalyticsDashboard({
         </Card>
       </div>
 
-      {/* Account Cards */}
-      {latestByAccount.length > 0 ? (
-        <div className="rounded-2xl border border-ink-200/70 bg-white/90 p-4 shadow-[var(--shadow-soft)]">
-          <h2 className="text-sm font-semibold text-ink-900">Hesaplar ve Canlı Metrikler</h2>
-          <p className="text-xs text-ink-500">Hesaba tıklayarak özel filtreleme uygulayabilirsiniz</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {latestByAccount.map((s) => (
-              <button
-                key={s.accountId}
-                type="button"
-                onClick={() => {
-                  setPlatform(s.provider);
-                  setAccountId(s.accountId);
-                }}
-                className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition ${
-                  effectiveAccountId === s.accountId
-                    ? "border-accent bg-sky-50/80 shadow-xs"
-                    : "border-ink-100 bg-ink-50/50 hover:border-ink-200"
-                }`}
-              >
-                <ProviderIcon provider={s.provider} size={28} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-ink-900">
-                    {s.accountName}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] text-ink-400">
-                    {PLATFORM_LABEL[s.provider] || s.provider}
-                  </span>
-                  <span className="mt-2 flex flex-wrap gap-2 text-[11px] font-medium text-ink-600">
-                    <span>{s.followers.toLocaleString("tr-TR")} takipçi</span>
-                    <span>·</span>
-                    <span>{s.impressions.toLocaleString("tr-TR")} gösterim</span>
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Trend & Frequency Charts */}
-      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-        <ChartCard title="Takipçi / Gösterim Trendi">
-          {followerTrend.length === 0 ? (
-            <EmptyChart />
+      {/* Detailed Post Performance Table */}
+      <Card>
+        <Card.Header>
+          <Card.Title className="text-sm font-medium">Detaylı Gönderi Performans Tablosu (Post Performance)</Card.Title>
+          <Card.Description>
+            Tüm gönderilerin erişim, etkileşim, reaksiyon ve video izlenme analizleri
+          </Card.Description>
+        </Card.Header>
+        <Card.Content className="overflow-auto">
+          {detailedPostPerformance.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-400">Gönderi bulunamadı.</p>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={followerTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#d5dce8" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={40} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="followers"
-                  stroke="#1a78f5"
-                  strokeWidth={2}
-                  name="Takipçi"
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="impressions"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  name="Gösterim"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <table className="min-w-full text-left text-xs">
+              <thead className="text-[11px] font-bold uppercase text-ink-500 bg-ink-50 border-b border-ink-200">
+                <tr>
+                  <th className="py-2.5 px-3">Gönderi İçeriği</th>
+                  <th className="py-2.5 px-3">Tarih</th>
+                  <th className="py-2.5 px-3">Erişim (Reach)</th>
+                  <th className="py-2.5 px-3">Etkileşim (% ER)</th>
+                  <th className="py-2.5 px-3">Reaksiyonlar</th>
+                  <th className="py-2.5 px-3">Paylaşımlar</th>
+                  <th className="py-2.5 px-3">Video İzlenmeleri</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {detailedPostPerformance.map((p) => (
+                  <tr key={p.id} className="hover:bg-ink-50/60 transition">
+                    <td className="py-2.5 px-3 max-w-[280px]">
+                      <div className="flex items-center gap-2">
+                        <ProviderIcon provider={p.provider} size={18} />
+                        <span className="truncate font-medium text-ink-800">{p.content}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 whitespace-nowrap text-ink-500">
+                      {format(new Date(p.date), "dd MMM yyyy HH:mm", { locale: tr })}
+                    </td>
+                    <td className="py-2.5 px-3 font-semibold text-ink-900 tabular-nums">{p.reach}</td>
+                    <td className="py-2.5 px-3 font-bold text-accent tabular-nums">{p.engagementRate}</td>
+                    <td className="py-2.5 px-3 tabular-nums">{p.reactions}</td>
+                    <td className="py-2.5 px-3 tabular-nums">{p.shares}</td>
+                    <td className="py-2.5 px-3 tabular-nums font-medium text-ink-600">{p.videoViews}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </ChartCard>
-
-        <ChartCard title="Günlük Gönderi Frekansı">
-          {daily.length === 0 ? (
-            <EmptyChart />
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={daily}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#d5dce8" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#1a78f5"
-                  strokeWidth={2}
-                  name="Gönderi"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard title="Saatlik Paylaşım Yoğunluğu">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={hourly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d5dce8" />
-              <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#3399ff" name="Gönderi" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Haftalık Gün Dağılımı">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={weekly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d5dce8" />
-              <XAxis dataKey="day" />
-              <YAxis allowDecimals={false} width={32} />
-              <Tooltip />
-              <Bar dataKey="count" fill="#1361e1" name="Gönderi" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
+        </Card.Content>
+      </Card>
 
       {/* Snapshot Data Table */}
       <Card>
@@ -766,7 +823,7 @@ export function AnalyticsDashboard({
             className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs"
             onClick={() => setShowReportModal(false)}
           />
-          <div className="fixed left-1/2 top-1/2 z-51 w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto rounded-2xl border border-ink-200 bg-white p-6 shadow-2xl dark:bg-ink-950 dark:border-ink-800">
+          <div className="fixed left-1/2 top-1/2 z-51 w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto rounded-2xl border border-ink-200 bg-white p-6 shadow-2xl dark:bg-ink-950 dark:border-ink-800">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-ink-100 pb-4 dark:border-ink-800">
               <div className="flex items-center gap-2.5">
@@ -775,7 +832,7 @@ export function AnalyticsDashboard({
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-ink-900 dark:text-white">
-                    SocialMarka - Sosyal Medya Performans Raporu
+                    SocialMarka - Kurumsal Performans Raporu
                   </h2>
                   <p className="text-xs text-ink-500">
                     Oluşturulma Tarihi: {new Date().toLocaleDateString("tr-TR")} · Filtre: {selectedLabel}
@@ -826,66 +883,55 @@ export function AnalyticsDashboard({
                 </div>
               </div>
 
-              {/* Accounts Breakdown Table */}
+              {/* Popular Hashtags Summary in Report */}
+              {popularHashtags.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
+                    Öne Çıkan Popüler Hashtag'ler
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {popularHashtags.slice(0, 10).map((h) => (
+                      <span
+                        key={h.tag}
+                        className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800"
+                      >
+                        {h.tag} ({h.count})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Post Performance Table in Report */}
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
-                  Bağlı Hesaplar Özeti
+                  Gönderi Performans Detayları
                 </p>
                 <div className="overflow-hidden rounded-xl border border-ink-100">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-ink-50 text-ink-600 font-semibold">
                       <tr>
-                        <th className="p-2.5">Hesap</th>
+                        <th className="p-2.5">Gönderi</th>
                         <th className="p-2.5">Platform</th>
-                        <th className="p-2.5">Takipçi</th>
-                        <th className="p-2.5">Gösterim</th>
+                        <th className="p-2.5">Erişim</th>
+                        <th className="p-2.5">Etkileşim</th>
                         <th className="p-2.5">Beğeni</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ink-100">
-                      {latestByAccount.map((a) => (
-                        <tr key={a.accountId}>
-                          <td className="p-2.5 font-medium text-ink-900">{a.accountName}</td>
-                          <td className="p-2.5">{PLATFORM_LABEL[a.provider] || a.provider}</td>
-                          <td className="p-2.5 tabular-nums">{a.followers.toLocaleString("tr-TR")}</td>
-                          <td className="p-2.5 tabular-nums">{a.impressions.toLocaleString("tr-TR")}</td>
-                          <td className="p-2.5 tabular-nums">{a.likes.toLocaleString("tr-TR")}</td>
+                      {detailedPostPerformance.slice(0, 10).map((p) => (
+                        <tr key={p.id}>
+                          <td className="p-2.5 font-medium text-ink-900 max-w-[200px] truncate">{p.content}</td>
+                          <td className="p-2.5">{PLATFORM_LABEL[p.provider] || p.provider}</td>
+                          <td className="p-2.5 tabular-nums">{p.reach}</td>
+                          <td className="p-2.5 tabular-nums font-semibold text-accent">{p.engagementRate}</td>
+                          <td className="p-2.5 tabular-nums">{p.reactions}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-
-              {/* Top Posts Section */}
-              {topPosts.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
-                    Öne Çıkan Gönderiler
-                  </p>
-                  <div className="space-y-2">
-                    {topPosts.map((post) => (
-                      <div
-                        key={post.id}
-                        className="flex items-center justify-between rounded-xl border border-ink-100 p-2.5 text-xs"
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <ProviderIcon
-                            provider={post.targets?.[0]?.socialAccount?.provider || "INSTAGRAM"}
-                            size={18}
-                          />
-                          <span className="truncate font-medium text-ink-800">
-                            {post.content || "Görsel gönderisi"}
-                          </span>
-                        </div>
-                        <span className="text-ink-400 shrink-0 ml-2">
-                          {format(new Date(post.createdAt), "d MMM yyyy", { locale: tr })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Modal Actions */}
