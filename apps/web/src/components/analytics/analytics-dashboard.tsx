@@ -193,6 +193,7 @@ export function AnalyticsDashboard({
 
   const filteredPosts = useMemo(() => {
     return posts.filter((p) => {
+      if (p.status !== "PUBLISHED") return false;
       const d = new Date(p.scheduledAt || p.createdAt);
       if (d < since || d > until) return false;
       if (platform === "ALL" && effectiveAccountId === "ALL") return true;

@@ -41,7 +41,7 @@ export default async function AnalyticsPage() {
       orderBy: { accountName: "asc" },
     }),
     prisma.post.findMany({
-      where: { workspaceId },
+      where: { workspaceId, isDeleted: false, status: "PUBLISHED" },
       select: {
         id: true,
         content: true,
