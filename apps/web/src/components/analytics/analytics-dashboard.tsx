@@ -5,17 +5,22 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { format, subDays, isAfter } from "date-fns";
+import { format, subDays } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Button, Card } from "@heroui/react";
 import { ProviderIcon } from "@/components/posts/provider-icon";
+import { exportAnalyticsToCSV } from "@/lib/analytics-export";
 
 type AccountOption = {
   id: string;
@@ -24,12 +29,24 @@ type AccountOption = {
   status: string;
 };
 
+type PostMedia = {
+  originalUrl: string;
+  mimeType: string;
+};
+
+type PostTarget = {
+  socialAccountId: string;
+  socialAccount?: { provider: string; accountName: string };
+};
+
 type Post = {
   id: string;
+  content?: string;
   scheduledAt: string | null;
   status: string;
   createdAt: string;
-  targets?: { socialAccountId: string; socialAccount?: { provider: string } }[];
+  media?: PostMedia[];
+  targets?: PostTarget[];
 };
 
 type Snapshot = {
@@ -56,6 +73,16 @@ const PLATFORM_LABEL: Record<string, string> = {
   PINTEREST: "Pinterest",
 };
 
+const PLATFORM_COLOR: Record<string, string> = {
+  INSTAGRAM: "#E1306C",
+  LINKEDIN: "#0A66C2",
+  YOUTUBE: "#FF0000",
+  X: "#1DA1F2",
+  TIKTOK: "#00F2FE",
+  PINTEREST: "#BD081C",
+  FACEBOOK: "#1877F2",
+};
+
 export function AnalyticsDashboard({
   accounts,
   posts,
@@ -73,13 +100,13 @@ export function AnalyticsDashboard({
   const [platform, setPlatform] = useState<string>("ALL");
   const [accountId, setAccountId] = useState<string>("ALL");
   const [range, setRange] = useState<"7" | "30" | "all" | "custom">("30");
-  
+
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
     const d = subDays(new Date(), 30);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   });
-  
+
   const [customEndDate, setCustomEndDate] = useState<string>(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -91,25 +118,31 @@ export function AnalyticsDashboard({
     return accounts.filter((a) => a.provider === platform);
   }, [accounts, platform]);
 
-  // Platform değişince geçersiz hesap seçimini sıfırla
   const effectiveAccountId =
     accountId !== "ALL" && accountOptions.some((a) => a.id === accountId)
       ? accountId
       : "ALL";
 
-  const { since, until } = useMemo(() => {
+  const { since, until, prevSince, prevUntil } = useMemo(() => {
+    const now = new Date();
     if (range === "7") {
-      return { since: subDays(new Date(), 7), until: new Date() };
+      const start = subDays(now, 7);
+      const prevStart = subDays(start, 7);
+      return { since: start, until: now, prevSince: prevStart, prevUntil: start };
     }
     if (range === "30") {
-      return { since: subDays(new Date(), 30), until: new Date() };
+      const start = subDays(now, 30);
+      const prevStart = subDays(start, 30);
+      return { since: start, until: now, prevSince: prevStart, prevUntil: start };
     }
     if (range === "all") {
-      return { since: new Date(0), until: new Date() };
+      return { since: new Date(0), until: now, prevSince: new Date(0), prevUntil: new Date(0) };
     }
     const start = customStartDate ? new Date(customStartDate + "T00:00:00") : new Date(0);
     const end = customEndDate ? new Date(customEndDate + "T23:59:59") : new Date();
-    return { since: start, until: end };
+    const diffMs = end.getTime() - start.getTime();
+    const prevStart = new Date(start.getTime() - diffMs);
+    return { since: start, until: end, prevSince: prevStart, prevUntil: start };
   }, [range, customStartDate, customEndDate]);
 
   const filteredSnapshots = useMemo(() => {
@@ -120,6 +153,16 @@ export function AnalyticsDashboard({
       return date >= since && date <= until;
     });
   }, [snapshots, platform, effectiveAccountId, since, until]);
+
+  const prevSnapshots = useMemo(() => {
+    if (range === "all") return [];
+    return snapshots.filter((s) => {
+      if (platform !== "ALL" && s.provider !== platform) return false;
+      if (effectiveAccountId !== "ALL" && s.accountId !== effectiveAccountId) return false;
+      const date = new Date(s.capturedAt);
+      return date >= prevSince && date < prevUntil;
+    });
+  }, [snapshots, platform, effectiveAccountId, range, prevSince, prevUntil]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((p) => {
@@ -150,18 +193,62 @@ export function AnalyticsDashboard({
     return Array.from(map.values());
   }, [filteredSnapshots]);
 
+  const prevLatestByAccount = useMemo(() => {
+    const map = new Map<string, Snapshot>();
+    const sorted = [...prevSnapshots].sort(
+      (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime()
+    );
+    for (const s of sorted) {
+      if (!map.has(s.accountId)) map.set(s.accountId, s);
+    }
+    return Array.from(map.values());
+  }, [prevSnapshots]);
+
   const totals = useMemo(() => {
+    const followers = latestByAccount.reduce((s, x) => s + x.followers, 0);
+    const following = latestByAccount.reduce((s, x) => s + x.following, 0);
+    const impressions = latestByAccount.reduce((s, x) => s + x.impressions, 0);
+    const reach = latestByAccount.reduce((s, x) => s + x.reach, 0);
+    const likes = latestByAccount.reduce((s, x) => s + x.likes, 0);
+    const comments = latestByAccount.reduce((s, x) => s + x.comments, 0);
+    const totalPosts = filteredPosts.length;
+    
+    const prevFollowers = prevLatestByAccount.reduce((s, x) => s + x.followers, 0);
+    const prevImpressions = prevLatestByAccount.reduce((s, x) => s + x.impressions, 0);
+
+    const followerGrowth = prevFollowers > 0 ? ((followers - prevFollowers) / prevFollowers) * 100 : 0;
+    const impressionGrowth = prevImpressions > 0 ? ((impressions - prevImpressions) / prevImpressions) * 100 : 0;
+
+    const engagementRate = impressions > 0 ? ((likes + comments) / impressions) * 100 : 0;
+    const avgLikesPerPost = totalPosts > 0 ? Math.round(likes / totalPosts) : likes;
+
     return {
-      followers: latestByAccount.reduce((s, x) => s + x.followers, 0),
-      following: latestByAccount.reduce((s, x) => s + x.following, 0),
-      impressions: latestByAccount.reduce((s, x) => s + x.impressions, 0),
-      reach: latestByAccount.reduce((s, x) => s + x.reach, 0),
-      likes: latestByAccount.reduce((s, x) => s + x.likes, 0),
-      comments: latestByAccount.reduce((s, x) => s + x.comments, 0),
-      totalPosts: filteredPosts.length,
+      followers,
+      following,
+      impressions,
+      reach,
+      likes,
+      comments,
+      totalPosts,
+      engagementRate,
+      avgLikesPerPost,
+      followerGrowth,
+      impressionGrowth,
       accounts: latestByAccount.length || (effectiveAccountId !== "ALL" ? 1 : accountOptions.length),
     };
-  }, [latestByAccount, filteredPosts.length, effectiveAccountId, accountOptions.length]);
+  }, [latestByAccount, prevLatestByAccount, filteredPosts.length, effectiveAccountId, accountOptions.length]);
+
+  const platformDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of latestByAccount) {
+      map.set(s.provider, (map.get(s.provider) || 0) + (s.followers || 1));
+    }
+    return Array.from(map.entries()).map(([name, value]) => ({
+      name: PLATFORM_LABEL[name] || name,
+      providerKey: name,
+      value,
+    }));
+  }, [latestByAccount]);
 
   const followerTrend = useMemo(() => {
     const map = new Map<string, { date: string; followers: number; impressions: number; n: number }>();
@@ -198,6 +285,19 @@ export function AnalyticsDashboard({
     return buckets;
   }, [filteredPosts]);
 
+  const peakHour = useMemo(() => {
+    let max = -1;
+    let peak = "18:00 - 21:00";
+    for (const b of hourly) {
+      if (b.count > max) {
+        max = b.count;
+        const hNum = parseInt(b.hour, 10);
+        peak = `${String(hNum).padStart(2, "0")}:00 - ${String((hNum + 2) % 24).padStart(2, "0")}:00`;
+      }
+    }
+    return peak;
+  }, [hourly]);
+
   const weekly = useMemo(() => {
     const days = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
     const counts = Array(7).fill(0);
@@ -212,8 +312,12 @@ export function AnalyticsDashboard({
   const tableRows = useMemo(() => {
     return [...filteredSnapshots]
       .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())
-      .slice(0, 40);
+      .slice(0, 50);
   }, [filteredSnapshots]);
+
+  const topPosts = useMemo(() => {
+    return filteredPosts.slice(0, 4);
+  }, [filteredPosts]);
 
   const selectedLabel =
     effectiveAccountId !== "ALL"
@@ -224,16 +328,17 @@ export function AnalyticsDashboard({
 
   return (
     <div className="min-w-0 space-y-6">
+      {/* Top Header & Export */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-400">
-            Performans
+            Performans & Raporlama
           </p>
           <h1 className="mt-1 font-display text-2xl font-medium tracking-tight text-ink-900">
-            Analitik
+            Analitik Dashboard
           </h1>
           <p className="mt-1 text-sm text-ink-500">
-            Platform ve hesap seçerek metrikleri filtreleyin · {selectedLabel}
+            Sosyal medya hesaplarınızın performans metrikleri ve büyüme oranları · {selectedLabel}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -272,15 +377,38 @@ export function AnalyticsDashboard({
               />
             </div>
           )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="font-semibold text-accent border-accent/30 hover:bg-sky-50"
+            onPress={() => {
+              exportAnalyticsToCSV(
+                tableRows.map((r) => ({
+                  date: r.capturedAt,
+                  accountName: r.accountName,
+                  provider: r.provider,
+                  followers: r.followers,
+                  following: r.following,
+                  impressions: r.impressions,
+                  reach: r.reach,
+                  likes: r.likes,
+                  comments: r.comments,
+                }))
+              );
+            }}
+          >
+            📥 Rapor İndir (CSV)
+          </Button>
         </div>
       </div>
 
-      {/* Filtreler */}
+      {/* Platform & Account Filters */}
       <div className="rounded-2xl border border-ink-200/70 bg-white/90 p-4 shadow-[var(--shadow-soft)]">
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-              Platform
+              Platform Filtresi
             </p>
             <div className="flex flex-wrap gap-2">
               <FilterChip
@@ -307,10 +435,10 @@ export function AnalyticsDashboard({
           </div>
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
-              Hesap
+              Hesap Filtresi
             </p>
             <select
-              className="h-10 w-full max-w-md rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800"
+              className="h-10 w-full max-w-md rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 focus:border-accent outline-none"
               value={effectiveAccountId}
               onChange={(e) => setAccountId(e.target.value)}
             >
@@ -323,30 +451,152 @@ export function AnalyticsDashboard({
                 </option>
               ))}
             </select>
-            {accountOptions.length === 0 ? (
-              <p className="mt-2 text-xs text-ink-400">Bu platformda bağlı hesap yok.</p>
-            ) : null}
           </div>
         </div>
       </div>
 
-      {/* Metrik kartları */}
+      {/* KPI Metric Cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Takipçi" value={totals.followers} hint="Son snapshot toplamı" />
-        <Metric label="Takip edilen" value={totals.following} />
-        <Metric label="Gösterim" value={totals.impressions} />
-        <Metric label="Erişim" value={totals.reach} />
-        <Metric label="Beğeni" value={totals.likes} />
-        <Metric label="Yorum" value={totals.comments} />
-        <Metric label="Gönderi" value={totals.totalPosts} hint="Filtrelenmiş aralık" />
-        <Metric label="Hesap" value={totals.accounts} />
+        <Metric
+          label="Toplam Takipçi"
+          value={totals.followers}
+          growth={totals.followerGrowth}
+          hint="Seçili platformlar toplamı"
+        />
+        <Metric
+          label="Etkileşim Oranı (% ER)"
+          value={`${totals.engagementRate.toFixed(2)}%`}
+          isString
+          hint="(Beğeni + Yorum) / Gösterim"
+        />
+        <Metric
+          label="Toplam Gösterim"
+          value={totals.impressions}
+          growth={totals.impressionGrowth}
+        />
+        <Metric label="Toplam Erişim" value={totals.reach} />
+        <Metric label="Toplam Beğeni" value={totals.likes} />
+        <Metric label="Toplam Yorum" value={totals.comments} />
+        <Metric label="Ort. Beğeni / Gönderi" value={totals.avgLikesPerPost} />
+        <Metric label="Yayınlanan Gönderi" value={totals.totalPosts} hint="Filtrelenmiş aralık" />
       </div>
 
-      {/* Hesap kırılımı */}
+      {/* AI Peak Hours & Insights Banner */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-amber-300/60 bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-100/40 p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md text-lg">
+            ⚡
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-amber-950">AI Paylaşım Zamanı Önerisi</h3>
+            <p className="text-xs text-amber-900/80 mt-0.5">
+              Hesaplarınızın aktiflik verilerine göre takipçilerinizin en yoğun olduğu saat aralığı:{" "}
+              <strong className="font-bold text-amber-950 underline">{peakHour}</strong>
+            </p>
+          </div>
+        </div>
+        <div className="rounded-xl bg-white/80 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-2xs">
+          En Yüksek Etkileşim Saati
+        </div>
+      </div>
+
+      {/* Top Posts & Platform Distribution Row */}
+      <div className="grid gap-4 xl:grid-cols-3">
+        {/* Platform Distribution Donut Chart */}
+        <Card className="xl:col-span-1">
+          <Card.Header>
+            <Card.Title className="text-sm font-medium">Platform Takipçi Dağılımı</Card.Title>
+          </Card.Header>
+          <Card.Content className="flex flex-col items-center justify-center">
+            {platformDistribution.length === 0 ? (
+              <EmptyChart />
+            ) : (
+              <div className="h-[220px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={platformDistribution}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {platformDistribution.map((entry) => (
+                        <Cell
+                          key={entry.name}
+                          fill={PLATFORM_COLOR[entry.providerKey] || "#1a78f5"}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card.Content>
+        </Card>
+
+        {/* Top Posts Showcase */}
+        <Card className="xl:col-span-2">
+          <Card.Header>
+            <Card.Title className="text-sm font-medium">Öne Çıkan Gönderiler</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            {topPosts.length === 0 ? (
+              <p className="py-8 text-center text-sm text-ink-400">Henüz yayınlanmış gönderi bulunmuyor.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {topPosts.map((post) => {
+                  const mediaUrl = post.media?.[0]?.originalUrl;
+                  const firstTarget = post.targets?.[0];
+                  const provider = firstTarget?.socialAccount?.provider || "INSTAGRAM";
+                  return (
+                    <div
+                      key={post.id}
+                      className="flex items-start gap-3 rounded-xl border border-ink-100 bg-ink-50/50 p-3 transition hover:border-ink-200"
+                    >
+                      {mediaUrl ? (
+                        <img
+                          src={mediaUrl}
+                          alt=""
+                          className="h-14 w-14 rounded-lg object-cover bg-ink-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent/20 to-accent/40 text-accent font-bold text-xs">
+                          POST
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ProviderIcon provider={provider} size={16} />
+                          <span className="text-[11px] font-semibold text-ink-600 truncate">
+                            {firstTarget?.socialAccount?.accountName || PLATFORM_LABEL[provider]}
+                          </span>
+                        </div>
+                        <p className="line-clamp-2 text-xs text-ink-800 leading-snug">
+                          {post.content || "Görsel paylaşımı"}
+                        </p>
+                        <p className="mt-1 text-[10px] text-ink-400">
+                          {format(new Date(post.createdAt), "d MMM yyyy", { locale: tr })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card.Content>
+        </Card>
+      </div>
+
+      {/* Account Cards */}
       {latestByAccount.length > 0 ? (
         <div className="rounded-2xl border border-ink-200/70 bg-white/90 p-4 shadow-[var(--shadow-soft)]">
-          <h2 className="text-sm font-semibold text-ink-900">Hesap özeti</h2>
-          <p className="text-xs text-ink-500">Seçime göre son metrikler</p>
+          <h2 className="text-sm font-semibold text-ink-900">Hesaplar ve Canlı Metrikler</h2>
+          <p className="text-xs text-ink-500">Hesaba tıklayarak özel filtreleme uygulayabilirsiniz</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {latestByAccount.map((s) => (
               <button
@@ -358,7 +608,7 @@ export function AnalyticsDashboard({
                 }}
                 className={`flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition ${
                   effectiveAccountId === s.accountId
-                    ? "border-accent bg-sky-50/80"
+                    ? "border-accent bg-sky-50/80 shadow-xs"
                     : "border-ink-100 bg-ink-50/50 hover:border-ink-200"
                 }`}
               >
@@ -370,7 +620,7 @@ export function AnalyticsDashboard({
                   <span className="mt-0.5 block text-[11px] text-ink-400">
                     {PLATFORM_LABEL[s.provider] || s.provider}
                   </span>
-                  <span className="mt-2 flex flex-wrap gap-2 text-[11px] text-ink-600">
+                  <span className="mt-2 flex flex-wrap gap-2 text-[11px] font-medium text-ink-600">
                     <span>{s.followers.toLocaleString("tr-TR")} takipçi</span>
                     <span>·</span>
                     <span>{s.impressions.toLocaleString("tr-TR")} gösterim</span>
@@ -382,8 +632,9 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
 
+      {/* Trend & Frequency Charts */}
       <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-        <ChartCard title="Takipçi / Gösterim trendi">
+        <ChartCard title="Takipçi / Gösterim Trendi">
           {followerTrend.length === 0 ? (
             <EmptyChart />
           ) : (
@@ -413,7 +664,8 @@ export function AnalyticsDashboard({
             </ResponsiveContainer>
           )}
         </ChartCard>
-        <ChartCard title="Günlük gönderi frekansı">
+
+        <ChartCard title="Günlük Gönderi Frekansı">
           {daily.length === 0 ? (
             <EmptyChart />
           ) : (
@@ -434,34 +686,36 @@ export function AnalyticsDashboard({
             </ResponsiveContainer>
           )}
         </ChartCard>
-        <ChartCard title="Saatlik paylaşım yoğunluğu">
+
+        <ChartCard title="Saatlik Paylaşım Yoğunluğu">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={hourly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d5dce8" />
               <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
               <Tooltip />
-              <Bar dataKey="count" fill="#3399ff" name="Gönderi" />
+              <Bar dataKey="count" fill="#3399ff" name="Gönderi" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="Haftalık dağılım">
+
+        <ChartCard title="Haftalık Gün Dağılımı">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weekly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d5dce8" />
               <XAxis dataKey="day" />
               <YAxis allowDecimals={false} width={32} />
               <Tooltip />
-              <Bar dataKey="count" fill="#1361e1" name="Gönderi" />
+              <Bar dataKey="count" fill="#1361e1" name="Gönderi" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
 
-      {/* Veri tablosu */}
+      {/* Snapshot Data Table */}
       <Card>
         <Card.Header>
-          <Card.Title>Snapshot listesi</Card.Title>
+          <Card.Title className="text-sm font-medium">Snapshot Kayıt Listesi</Card.Title>
           <Card.Description>
             {tableRows.length} kayıt · platform / hesap / tarih filtresi uygulandı
           </Card.Description>
@@ -469,7 +723,7 @@ export function AnalyticsDashboard({
         <Card.Content className="overflow-auto">
           {tableRows.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-400">
-              Seçilen filtrede veri yok. Demo seed çalıştırdıysanız tarih aralığını genişletin.
+              Seçilen filtrede veri yok.
             </p>
           ) : (
             <table className="min-w-full text-left text-sm">
@@ -487,7 +741,7 @@ export function AnalyticsDashboard({
               </thead>
               <tbody>
                 {tableRows.map((row, i) => (
-                  <tr key={`${row.accountId}-${row.capturedAt}-${i}`} className="border-t border-separator/50">
+                  <tr key={`${row.accountId}-${row.capturedAt}-${i}`} className="border-t border-separator/50 hover:bg-ink-50/50 transition">
                     <td className="py-2 pr-3 whitespace-nowrap text-ink-600">
                       {new Date(row.capturedAt).toLocaleString("tr-TR")}
                     </td>
@@ -531,7 +785,7 @@ function FilterChip({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition ${
         active
-          ? "border-accent bg-accent text-white"
+          ? "border-accent bg-accent text-white font-semibold"
           : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
       }`}
     >
@@ -544,17 +798,33 @@ function FilterChip({
 function Metric({
   label,
   value,
+  growth,
+  isString,
   hint,
 }: {
   label: string;
-  value: number;
+  value: number | string;
+  growth?: number;
+  isString?: boolean;
   hint?: string;
 }) {
+  const isPositive = (growth || 0) >= 0;
   return (
     <div className="rounded-2xl border border-ink-200/70 bg-gradient-to-br from-white to-ink-50/80 p-4 shadow-[var(--shadow-soft)]">
-      <p className="text-xs font-medium text-ink-500">{label}</p>
-      <p className="mt-1 font-display text-2xl font-medium tracking-tight text-ink-900 tabular-nums">
-        {value.toLocaleString("tr-TR")}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-ink-500">{label}</p>
+        {growth !== undefined && growth !== 0 ? (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              isPositive ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+            }`}
+          >
+            {isPositive ? `+${growth.toFixed(1)}%` : `${growth.toFixed(1)}%`}
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink-900 tabular-nums">
+        {isString ? value : (value as number).toLocaleString("tr-TR")}
       </p>
       {hint ? <p className="mt-1 text-[11px] text-ink-400">{hint}</p> : null}
     </div>

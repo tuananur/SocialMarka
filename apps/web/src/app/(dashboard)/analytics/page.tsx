@@ -44,16 +44,25 @@ export default async function AnalyticsPage() {
       where: { workspaceId },
       select: {
         id: true,
+        content: true,
         scheduledAt: true,
         status: true,
         createdAt: true,
+        media: {
+          select: {
+            originalUrl: true,
+            mimeType: true,
+          },
+          take: 1,
+        },
         targets: {
           select: {
             socialAccountId: true,
-            socialAccount: { select: { provider: true } },
+            socialAccount: { select: { provider: true, accountName: true } },
           },
         },
       },
+      orderBy: { createdAt: "desc" },
       take: 500,
     }),
   ]);
