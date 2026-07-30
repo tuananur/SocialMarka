@@ -8,12 +8,28 @@ const figtree = Figtree({
   subsets: ["latin", "latin-ext"],
   variable: "--font-sans",
   weight: ["300", "400", "500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "SocialMarka — Sosyal Medya Yönetim Platformu",
+  title: {
+    default: "SocialMarka — Sosyal Medya Yönetim Platformu",
+    template: "%s · SocialMarka",
+  },
   description:
     "Tüm sosyal medya hesaplarınızı tek yerden yönetin. Planlayın, yayınlayın, etkileşime geçin.",
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    siteName: "SocialMarka",
+    title: "SocialMarka — Sosyal Medya Yönetim Platformu",
+    description: "Tüm sosyal medya hesaplarınızı tek yerden yönetin. Planlayın, yayınlayın, etkileşime geçin.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SocialMarka — Sosyal Medya Yönetim Platformu",
+    description: "Tüm sosyal medya hesaplarınızı tek yerden yönetin.",
+  },
   other: {
     "tiktok-developers-site-verification": "vHdkJVCIpQ1o4YcttaDHkpAUMx6Hk0VL",
   },

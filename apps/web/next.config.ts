@@ -16,7 +16,10 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "**" },
     ],
   },
+  reactStrictMode: true,
+  compress: true,
   experimental: {
+    optimizePackageImports: ["@heroui/react", "recharts", "date-fns"],
     serverActions: {
       bodySizeLimit: "64mb",
     },

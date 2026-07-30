@@ -156,6 +156,9 @@ model Post {
   workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   targets   PostTarget[]
   media     MediaAsset[]
+
+  @@index([workspaceId, status, scheduledAt])
+  @@index([workspaceId, createdAt])
 }
 
 enum PostStatus {
@@ -179,6 +182,9 @@ model PostTarget {
 
   post          Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
   socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@index([postId, status])
+  @@index([socialAccountId, status])
 }
 
 enum TargetStatus {
@@ -266,6 +272,8 @@ model AnalyticsSnapshot {
   capturedAt      DateTime @default(now())
 
   socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@index([socialAccountId, capturedAt])
 }
 
 model SystemMetricSnapshot {
