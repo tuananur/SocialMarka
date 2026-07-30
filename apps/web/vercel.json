@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/posts/cron-trigger?key=socialmarka-cron-default-key",
-      "schedule": "*/1 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
