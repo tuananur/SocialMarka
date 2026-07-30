@@ -269,6 +269,19 @@ export function PostsWorkspace({
     setMode("compose");
   }
 
+  const hasScheduledPosts = useMemo(
+    () => posts.some((p) => p.status === "SCHEDULED" && !(p as any).isDeleted),
+    [posts],
+  );
+
+  useEffect(() => {
+    if (!hasScheduledPosts || mode !== "list") return;
+    const interval = setInterval(() => {
+      void refresh();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [hasScheduledPosts, mode]);
+
   useEffect(() => {
     const editId = searchParams.get("edit");
     if (!editId || openedEditFromQuery.current === editId) return;

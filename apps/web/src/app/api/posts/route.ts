@@ -59,9 +59,13 @@ export async function GET() {
     });
 
     if (duePosts.length > 0) {
-      const { publishPostTargetInline } = await import("@/lib/run-publish");
+      const { publishPostTargetInline, refreshPostStatus } = await import("@/lib/run-publish");
       for (const post of duePosts) {
         const pendingTargets = post.targets.filter((t) => t.status === TargetStatus.PENDING);
+        if (pendingTargets.length === 0) {
+          await refreshPostStatus(post.id);
+          continue;
+        }
         for (const target of pendingTargets) {
           try {
             await publishPostTargetInline({ postId: post.id, postTargetId: target.id });

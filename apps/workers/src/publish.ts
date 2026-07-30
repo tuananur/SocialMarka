@@ -307,19 +307,15 @@ async function loadMediaFile(
 
 async function refreshPostStatus(postId: string) {
   const targets = await prisma.postTarget.findMany({ where: { postId } });
-  const published = targets.filter((t) => t.status === TargetStatus.PUBLISHED)
-    .length;
+  const published = targets.filter((t) => t.status === TargetStatus.PUBLISHED).length;
   const failed = targets.filter((t) => t.status === TargetStatus.FAILED).length;
-  const pending = targets.filter((t) => t.status === TargetStatus.PENDING)
-    .length;
+  const pending = targets.filter((t) => t.status === TargetStatus.PENDING).length;
 
   let status: PostStatus = PostStatus.SCHEDULED;
-  if (pending === 0 && failed === 0 && published > 0)
-    status = PostStatus.PUBLISHED;
-  else if (pending === 0 && failed > 0 && published > 0)
-    status = PostStatus.PARTIAL_FAILED;
-  else if (pending === 0 && failed > 0 && published === 0)
-    status = PostStatus.FAILED;
+  if (pending === 0 && failed === 0 && published > 0) status = PostStatus.PUBLISHED;
+  else if (pending === 0 && failed > 0 && published > 0) status = PostStatus.PARTIAL_FAILED;
+  else if (pending === 0 && failed > 0 && published === 0) status = PostStatus.FAILED;
+  else if (pending === 0 && failed === 0 && published === 0) status = PostStatus.FAILED;
 
   await prisma.post.update({ where: { id: postId }, data: { status } });
 }
